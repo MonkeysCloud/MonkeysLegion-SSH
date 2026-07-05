@@ -1,106 +1,111 @@
-# Roadmap: Native PHP SSH Utility Library (PHP 8.4+)
+# MonkeysLegion SSH
 
-This document outlines the architectural scope, technical constraints, and implementation phases for this native PHP SSH utility wrapper. The primary goal of this library is to transform the verbose and often clunky native `ext-ssh2` functions into a fluent, developer-centric API (DX-focused) without introducing external heavy-userland protocol implementations.
-
----
-
-## Technical Constraints & Requirements
-
-- **PHP Version:** `^8.4` (utilizing modern features such as property hooks, asymmetric visibility, and enhanced typing).
-- **Required Extensions:**
-  - `ext-ssh2`: Native C-bindings for `libssh2` to handle protocol execution.
-  - `ext-sockets`: For granular socket-level management, timeouts, and keep-alive handling.
-- **Operating System Focus:** Tailored for Linux/Unix targets. Windows client runtimes are secondary priorities.
-
----
-
-## Architecture Design
-
-The library uses a **Manager-backed Instance Architecture** with an optional static access layer (Facade pattern) to provide both builder-style configuration management and dynamic, ad-hoc runtime builders.
-
-```text
-┌─────────────────────────┐
-│  Static Facade (SSH)    │
-└────────────┬────────────┘
-             │
-             ▼
-┌─────────────────────────────────────┐
-│   SSHManager                        │
-│   (Registry & Cache)                │◄── Reads ── config/ssh.php
-└────┬──────────────┬─────────────────┘
-     │              │
-     │ Creates      │
-     ▼              ▼
-┌──────────────────┐  ┌─────────────────────────┐
-│ ConnectionBuilder│──▶│  SSHConnection          │
-│ (Fluent API)     │   │  (Resource Wrapper)     │
-└──────────────────┘   └─────────────────────────┘
-```
-
-### Configuration Schema (`config/ssh.php`)
+## Quick Runtime Usage
 
 ```php
-return [
-    'default' => 'production',
+use MonkeysLegion\SSH\Facades\SSH;
 
+$result = SSH::runtime()
+    ->to('127.0.0.1')
+    ->port(22)
+    ->as('forge')
+    ->withPassword('secret')
+    ->timeout(10)
+    ->connect()
+    ->execute('uname -a');
+```
+
+## Manager + Profile Registry
+
+```php
+use MonkeysLegion\SSH\Core\SSHManager;
+
+$manager = new SSHManager([
+    'default' => 'production',
     'connections' => [
         'production' => [
             'host' => '127.0.0.1',
             'port' => 22,
             'username' => 'forge',
-            'auth' => 'key', // options: 'password', 'key', 'agent'
-            'private_key' => '/home/user/.ssh/id_rsa',
-            'passphrase' => null,
+            'auth' => 'password',
+            'password' => 'secret',
             'timeout' => 10,
         ],
     ],
-];
+]);
+
+// Explicit runtime registration
+$manager->register('staging', [
+    'host' => '10.0.0.10',
+    'port' => 22,
+    'username' => 'deploy',
+    'auth' => 'key',
+    'private_key' => '/home/user/.ssh/id_rsa',
+    'passphrase' => null,
+    'timeout' => 10,
+]);
+
+// Lazy connection creation + cache
+$prod = $manager->connection('production');
+$prodAgain = $manager->connection('production'); // returns cached instance
 ```
 
----
+## Static Facade Gateway
 
-## Scope Boundary Matrix
+```php
+use MonkeysLegion\SSH\Facades\SSH;
 
-| Feature | In Scope | Out of Scope |
-|---------|----------|--------------|
-| Fluent Connection Building | ✓ Object-oriented auth handling (Key, Password, Agent) | |
-| Interactive TTY / Shells | | ✓ Persistent interactive terminal loops (e.g., live top) |
-| Command Execution Engine | ✓ Separation of STDOUT and STDERR streams with exit code capturing | |
-| Custom Crypto Handshakes | | ✓ Userland cryptography implementations (handled entirely by libssh2) |
-| SFTP Stream Wrapper | ✓ High-level abstractions for transfers, structural changes (mkdir, chmod) | |
-| Broad Multi-OS Exploits | | ✓ Workarounds for structural flaws within Windows-based SSH hosts |
-| Command Pipelines | ✓ Sequential command chains with configurable halt-on-failure behavior | |
-| Daemonization | | ✓ Long-running background workers managing multiplexed connection pools |
+SSH::configure(require __DIR__ . '/config/ssh.php');
+SSH::register('hotfix', [
+    'host' => '127.0.0.1',
+    'port' => 22,
+    'username' => 'ops',
+    'auth' => 'password',
+    'password' => 'ops-secret',
+    'timeout' => 10,
+]);
+SSH::useDefaultConnection('hotfix');
 
----
+// Static proxy to default connection
+$isConnected = SSH::isConnected();
+$result = SSH::execute('whoami');
+```
 
-## Development Phases
+## Phase 2 Deliverables Completed
 
-### Phase 1: Core Engine & Foundations (Current Phase)
+1. **Fluent runtime builder** (`ConnectionBuilder`) supports direct chain usage and array-profile parsing through `fromProfile()`.
+2. **Manager-backed profile system** (`SSHManager`) parses config arrays, supports explicit profile registration (`register`, `registerMany`), default profile selection, lazy connection resolution, and cache invalidation (`forgetConnection`).
+3. **Global static gateway** (`SSH` facade) now supports configuration, profile registration, default connection switching, cache forgetting, runtime builder access, and static proxy forwarding (`__callStatic`) to default connection methods.
 
-- [ ] Design the underlying `SSHConnection` class to encapsulate the native libssh2 resource.
-- [ ] Implement basic authentication drivers: `PasswordAuthentication` and `PublicKeyAuthentication`.
-- [ ] Build the raw `StreamHandler` to extract blocks securely from SSH channels.
-- [ ] Implement an explicit `CommandResult` value object containing string buffers for output, error, and exit_code.
+## Phase 3 Deliverables Completed
 
-### Phase 2: Fluent Interface & Construction
+1. **SFTP subsystem abstraction** (`SFTPClient`) using native wrapper paths (`ssh2.sftp://`) for file operations plus structural changes (`mkdir`, `chmod`, `delete`).
+2. **Transfer metrics** (`SFTPTransferMetrics`) with tracked upload/download byte totals and operation counts.
+3. **Sequential pipelines** (`CommandPipeline` + `PipelineResult`) integrated into `SSHConnection::pipeline(...)` with configurable halt-on-failure behavior and state-aware closure steps.
 
-- [ ] Implement the `ConnectionBuilder` pattern for runtime configuration:
+## Phase 4 Deliverables Completed
 
-  ```php
-  SSH::runtime()->to($host)->as($user)->withKey($path)->connect();
-  ```
+1. **Exception QoL improvements** with dedicated factories:
+   - `ConnectionRefusedException::forHost($host, $port)`
+   - `AuthenticationFailedException::password($username)`
+   - `AuthenticationFailedException::publicKey($username, $privateKeyPath)`
+2. **Testing fake utilities** through `SSH::fake()` with runtime helpers:
+   - `SSH::fakeCommand($command, $result)`
+   - `SSH::fakeDefault($result)`
+   - `SSH::assertExecuted($command)`
+3. **Socket-free test execution path** via `FakeSSHConnection` and `SSHFakeRegistry`, enabling deterministic command stubbing without active SSH infrastructure.
 
-- [ ] Build the `SSHManager` to parse configuration state arrays, register explicit connection profiles, and cache instantiated resources lazily.
-- [ ] Finalize the global SSH static proxy gateway.
+## Testing and Validation
 
-### Phase 3: Advanced Stream Utilities (SFTP & Pipelines)
+```bash
+# Unit + feature tests (integration tests skipped unless enabled)
+composer test
 
-- [ ] Create an explicit SFTP subsystem abstraction mapping to native stream protocols (`ssh2.sftp://`).
-- [ ] Provide high-level file tracking metrics (upload, download sizes).
-- [ ] Implement sequential pipelines (`$connection->pipeline(fn($pipe) => ...)`), allowing state propagation or execution halts upon non-zero exit codes.
+# Full integration flow
+docker compose -f docker-compose.integration.yml up -d
+RUN_INTEGRATION_TESTS=1 composer test
+docker compose -f docker-compose.integration.yml down
 
-### Phase 4: Developer Quality of Life (QoL)
-
-- [ ] Introduce custom exception structures handling native connection failures gracefully (e.g., `ConnectionRefusedException`, `AuthenticationFailedException`).
-- [ ] Add automated mocking/faking utilities for unit testing without hitting active socket infrastructure (`SSH::fake()`).
+# Static analysis (level 9)
+composer phpstan
+```
