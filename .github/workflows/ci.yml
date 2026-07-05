@@ -22,10 +22,10 @@ jobs:
           USER_PASSWORD: integration-password
           SUDO_ACCESS: 'false'
         options: >-
-          --health-cmd "sshpass -p integration-password ssh -o StrictHostKeyChecking=no -p 2222 integration@127.0.0.1 'echo ok'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd "nc -z 127.0.0.1 2222 || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
         ports:
           - 2222:2222
 
