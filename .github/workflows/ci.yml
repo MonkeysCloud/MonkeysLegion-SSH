@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      ssh-server:
+        image: lscr.io/linuxserver/openssh-server:latest
+        env:
+          PUID: 1000
+          PGID: 1000
+          TZ: UTC
+          PASSWORD_ACCESS: 'true'
+          USER_NAME: integration
+          USER_PASSWORD: integration-password
+          SUDO_ACCESS: 'false'
+        options: >-
+          --health-cmd "sshpass -p integration-password ssh -o StrictHostKeyChecking=no -p 2222 integration@127.0.0.1 'echo ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 2222:2222
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: ssh2
+          tools: composer:latest
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Run unit tests
+        run: composer test
+
+      - name: Run static analysis (PHPStan level 9)
+        run: composer phpstan
+
+      - name: Wait for SSH server
+        run: |
+          for i in {1..30}; do
+            if sshpass -p integration-password ssh -o StrictHostKeyChecking=no -p 2222 integration@127.0.0.1 'echo ok' 2>/dev/null; then
+              echo "SSH server is ready"
+              exit 0
+            fi
+            echo "Waiting for SSH server... attempt $i/30"
+            sleep 1
+          done
+          echo "SSH server failed to start"
+          exit 1
+
+      - name: Run integration tests
+        run: RUN_INTEGRATION_TESTS=1 composer test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: .phpunit.result.cache
+          retention-days: 7
