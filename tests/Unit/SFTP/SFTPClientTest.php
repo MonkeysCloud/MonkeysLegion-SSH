@@ -7,14 +7,17 @@ use MonkeysLegion\SSH\SFTP\SFTPTransferMetrics;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Custom stream wrapper that simulates the ssh2.sftp:// protocol for unit testing.
+ * Custom stream wrapper that simulates an SFTP protocol for unit testing.
  *
- * It stores file contents in memory keyed by path so we can verify reads/writes.
+ * Uses the sftp-fake:// scheme so it never interferes with the real
+ * ssh2.sftp:// wrapper that other tests depend on.
  */
 class FakeSftpStreamWrapper
 {
     /** @var array<string, string> */
     private static array $storage = [];
+
+    public mixed $context;
 
     private int $position = 0;
     private string $path = '';
@@ -41,14 +44,13 @@ class FakeSftpStreamWrapper
 
     public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
     {
-        // Strip the ssh2.sftp://N prefix to get the remote path
-        $this->path = \preg_replace('#^ssh2\.sftp://\d+#', '', $path) ?? $path;
+        $this->path = \preg_replace('#^sftp-fake://\d+#', '', $path) ?? $path;
         $this->position = 0;
 
         if (\str_contains($mode, 'w')) {
             self::$storage[$this->path] = '';
         } elseif (!isset(self::$storage[$this->path])) {
-            return false; // File doesn't exist for read
+            return false;
         }
 
         return true;
@@ -97,7 +99,7 @@ class FakeSftpStreamWrapper
      */
     public function url_stat(string $path, int $flags): array|false
     {
-        $remotePath = \preg_replace('#^ssh2.sftp://\d+#', '', $path) ?? $path;
+        $remotePath = \preg_replace('#^sftp-fake://\d+#', '', $path) ?? $path;
         if (!isset(self::$storage[$remotePath])) {
             return false;
         }
@@ -118,10 +120,9 @@ class SFTPClientTest extends TestCase
     protected function setUp(): void
     {
         FakeSftpStreamWrapper::reset();
-        if (\in_array('ssh2.sftp', \stream_get_wrappers(), true)) {
-            \stream_wrapper_unregister('ssh2.sftp');
+        if (!\in_array('sftp-fake', \stream_get_wrappers(), true)) {
+            \stream_wrapper_register('sftp-fake', FakeSftpStreamWrapper::class);
         }
-        \stream_wrapper_register('ssh2.sftp', FakeSftpStreamWrapper::class);
     }
 
     protected function tearDown(): void
@@ -132,10 +133,14 @@ class SFTPClientTest extends TestCase
             }
         }
         $this->tempFiles = [];
+    }
 
-        if (\in_array('ssh2.sftp', \stream_get_wrappers(), true)) {
-            \stream_wrapper_unregister('ssh2.sftp');
-        }
+    private function createClient(
+        ?SFTPTransferMetrics $metrics = null,
+        ?callable $initializer = null,
+    ): SFTPClient {
+        $session = \fopen('php://temp', 'rb+');
+        return new SFTPClient($session, $metrics, $initializer, 'sftp-fake');
     }
 
     public function test_sftp_client_can_be_instantiated(): void
@@ -158,8 +163,7 @@ class SFTPClientTest extends TestCase
 
     public function test_upload_throws_when_local_file_does_not_exist(): void
     {
-        $session = \fopen('php://temp', 'rb+');
-        $client = new SFTPClient($session, null, static fn (): mixed => \fopen('php://temp', 'rb+'));
+        $client = $this->createClient();
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Local file does not exist');
@@ -168,8 +172,7 @@ class SFTPClientTest extends TestCase
 
     public function test_download_throws_when_local_directory_does_not_exist(): void
     {
-        $session = \fopen('php://temp', 'rb+');
-        $client = new SFTPClient($session, null, static fn (): mixed => \fopen('php://temp', 'rb+'));
+        $client = $this->createClient(initializer: static fn (): mixed => \fopen('php://temp', 'rb+'));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Local directory does not exist');
@@ -178,8 +181,7 @@ class SFTPClientTest extends TestCase
 
     public function test_handle_throws_when_initializer_returns_false(): void
     {
-        $session = \fopen('php://temp', 'rb+');
-        $client = new SFTPClient($session, null, static fn (): bool => false);
+        $client = $this->createClient(initializer: static fn (): bool => false);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Unable to initialize SFTP subsystem.');
@@ -188,8 +190,7 @@ class SFTPClientTest extends TestCase
 
     public function test_handle_throws_when_initializer_returns_null(): void
     {
-        $session = \fopen('php://temp', 'rb+');
-        $client = new SFTPClient($session, null, static fn (): null => null);
+        $client = $this->createClient(initializer: static fn (): null => null);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Unable to initialize SFTP subsystem.');
@@ -198,8 +199,7 @@ class SFTPClientTest extends TestCase
 
     public function test_handle_throws_when_initializer_returns_non_resource(): void
     {
-        $session = \fopen('php://temp', 'rb+');
-        $client = new SFTPClient($session, null, static fn (): string => 'not-a-resource');
+        $client = $this->createClient(initializer: static fn (): string => 'not-a-resource');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Unable to initialize SFTP subsystem.');
@@ -208,10 +208,9 @@ class SFTPClientTest extends TestCase
 
     public function test_upload_transfers_file_and_records_metrics(): void
     {
-        $session = \fopen('php://temp', 'rb+');
         $handle = \fopen('php://temp', 'rb+');
         $metrics = new SFTPTransferMetrics();
-        $client = new SFTPClient($session, $metrics, static fn (): mixed => $handle);
+        $client = $this->createClient($metrics, static fn (): mixed => $handle);
 
         $localFile = $this->createTempFile('upload-content-here');
         $remotePath = '/remote/uploaded.txt';
@@ -227,10 +226,9 @@ class SFTPClientTest extends TestCase
 
     public function test_download_transfers_file_and_records_metrics(): void
     {
-        $session = \fopen('php://temp', 'rb+');
         $handle = \fopen('php://temp', 'rb+');
         $metrics = new SFTPTransferMetrics();
-        $client = new SFTPClient($session, $metrics, static fn (): mixed => $handle);
+        $client = $this->createClient($metrics, static fn (): mixed => $handle);
 
         $remotePath = '/remote/source.txt';
         FakeSftpStreamWrapper::set($remotePath, 'download-content-here');
@@ -249,9 +247,8 @@ class SFTPClientTest extends TestCase
 
     public function test_download_throws_when_remote_file_does_not_exist(): void
     {
-        $session = \fopen('php://temp', 'rb+');
         $handle = \fopen('php://temp', 'rb+');
-        $client = new SFTPClient($session, null, static fn (): mixed => $handle);
+        $client = $this->createClient(initializer: static fn (): mixed => $handle);
 
         $localFile = \sys_get_temp_dir() . '/mlssh-download-fail-test.txt';
         $this->tempFiles[] = $localFile;
@@ -263,12 +260,10 @@ class SFTPClientTest extends TestCase
 
     public function test_handle_is_cached_after_first_initialization(): void
     {
-        $session = \fopen('php://temp', 'rb+');
-        $initCalls = 0;
         $handle = \fopen('php://temp', 'rb+');
+        $initCalls = 0;
         $metrics = new SFTPTransferMetrics();
-        $client = new SFTPClient(
-            $session,
+        $client = $this->createClient(
             $metrics,
             static function () use ($handle, &$initCalls): mixed {
                 $initCalls++;
@@ -282,7 +277,6 @@ class SFTPClientTest extends TestCase
         $localFile2 = $this->createTempFile('content-two');
         $client->upload($localFile2, '/remote/two.txt');
 
-        // The SFTP handle should only be initialized once
         $this->assertSame(1, $initCalls);
         $this->assertSame(2, $metrics->uploadCount());
     }

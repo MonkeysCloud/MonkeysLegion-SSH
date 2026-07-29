@@ -15,7 +15,8 @@ class SFTPClient
     public function __construct(
         private mixed $session,
         ?SFTPTransferMetrics $metrics = null,
-        ?callable $initializer = null
+        ?callable $initializer = null,
+        private string $streamScheme = 'ssh2.sftp',
     ) {
         $this->metrics = $metrics ?? new SFTPTransferMetrics();
         $this->initializer = $initializer !== null
@@ -74,10 +75,12 @@ class SFTPClient
 
     public function chmod(string $remotePath, int $mode): void
     {
+        $normalized = \str_starts_with($remotePath, '/') ? $remotePath : '/' . $remotePath;
+
         if (\function_exists('ssh2_sftp_chmod')) {
-            $success = \ssh2_sftp_chmod($this->handle(), $remotePath, $mode);
+            $success = \ssh2_sftp_chmod($this->handle(), $normalized, $mode);
         } else {
-            $success = \chmod($this->streamPath($remotePath), $mode);
+            $success = \chmod($this->streamPath($normalized), $mode);
         }
 
         if (!$success) {
@@ -102,7 +105,7 @@ class SFTPClient
     {
         $normalized = \str_starts_with($remotePath, '/') ? $remotePath : '/' . $remotePath;
         $handle = $this->handle();
-        return \sprintf('ssh2.sftp://%d%s', (int) $handle, $normalized);
+        return \sprintf('%s://%d%s', $this->streamScheme, (int) $handle, $normalized);
     }
 
     /**
