@@ -22,13 +22,16 @@ class StreamHandler
     /** @var \Closure */
     private \Closure $flush;
 
+    private int $maxOutputSize;
+
     public function __construct(
         ?callable $setBlocking = null,
         ?callable $readBlock = null,
         ?callable $fetchStream = null,
         ?callable $getExitStatusFn = null,
         ?callable $writeBlock = null,
-        ?callable $flush = null
+        ?callable $flush = null,
+        int $maxOutputSize = 52428800, // 50 MB
     ) {
         $this->setBlocking = $setBlocking !== null
             ? $setBlocking(...)
@@ -48,15 +51,19 @@ class StreamHandler
         $this->flush = $flush !== null
             ? $flush(...)
             : $this->nativeFlush(...);
+        $this->maxOutputSize = $maxOutputSize;
     }
 
-    public function read(mixed $channel, int $blockSize = 8192): string
+    public function read(mixed $channel, int $blockSize = 8192, ?int $timeout = null, ?int $maxSize = null): string
     {
         $this->setReadableBlockingMode($channel);
-        return $this->readFromStream($channel, $blockSize);
+        if ($timeout !== null) {
+            $this->applyTimeout($channel, $timeout);
+        }
+        return $this->readFromStream($channel, $blockSize, $maxSize);
     }
 
-    public function readError(mixed $channel, int $blockSize = 8192): string
+    public function readError(mixed $channel, int $blockSize = 8192, ?int $timeout = null, ?int $maxSize = null): string
     {
         $stderr = ($this->fetchStream)($channel, \SSH2_STREAM_STDERR);
         if ($stderr === false) {
@@ -64,7 +71,10 @@ class StreamHandler
         }
 
         $this->setReadableBlockingMode($stderr);
-        return $this->readFromStream($stderr, $blockSize);
+        if ($timeout !== null) {
+            $this->applyTimeout($stderr, $timeout);
+        }
+        return $this->readFromStream($stderr, $blockSize, $maxSize);
     }
 
     public function write(mixed $channel, string $data): int
@@ -88,6 +98,15 @@ class StreamHandler
         return $status;
     }
 
+    public function setMaxOutputSize(int $bytes): self
+    {
+        if ($bytes < 1) {
+            throw new \InvalidArgumentException('Max output size must be at least 1 byte.');
+        }
+        $this->maxOutputSize = $bytes;
+        return $this;
+    }
+
     private function setReadableBlockingMode(mixed $stream): void
     {
         $success = ($this->setBlocking)($stream, true);
@@ -96,11 +115,24 @@ class StreamHandler
         }
     }
 
-    private function readFromStream(mixed $stream, int $blockSize): string
+    private function applyTimeout(mixed $stream, int $seconds): void
+    {
+        $resource = $this->requireResource($stream);
+        \stream_set_timeout($resource, $seconds);
+    }
+
+    private function readFromStream(mixed $stream, int $blockSize, ?int $maxSize = null): string
     {
         $resource = $this->requireResource($stream);
         $buffer = '';
+        $limit = $maxSize ?? $this->maxOutputSize;
+
         while (!\feof($resource)) {
+            $meta = \stream_get_meta_data($resource);
+            if (!empty($meta['timed_out'])) {
+                throw new \RuntimeException('SSH stream read timed out.');
+            }
+
             $chunk = ($this->readBlock)($resource, $blockSize);
             if ($chunk === false) {
                 throw new \RuntimeException('Unable to read from SSH stream.');
@@ -111,6 +143,12 @@ class StreamHandler
             }
 
             $buffer .= $chunk;
+
+            if (\strlen($buffer) > $limit) {
+                throw new \RuntimeException(
+                    \sprintf('SSH stream output exceeded maximum size of %d bytes.', $limit)
+                );
+            }
         }
 
         return $buffer;
@@ -138,7 +176,7 @@ class StreamHandler
 
     private function nativeGetExitStatus(mixed $channel): int|false
     {
-        if (!\is_resource($channel) && !\is_object($channel)) {
+        if (!\is_resource($channel)) {
             throw new \RuntimeException('SSH channel is invalid.');
         }
 

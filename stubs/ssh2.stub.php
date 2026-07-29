@@ -3,6 +3,11 @@
 const SSH2_TERM_UNIT_CHARS = 0;
 const SSH2_STREAM_STDERR = 1;
 
+const SSH2_FINGERPRINT_MD5 = 0;
+const SSH2_FINGERPRINT_SHA1 = 1;
+const SSH2_FINGERPRINT_HEX = 0;
+const SSH2_FINGERPRINT_RAW = 2;
+
 /**
  * @param resource|object $session
  */
@@ -20,6 +25,13 @@ function ssh2_auth_pubkey_file(
     string $privkeyfile,
     string $passphrase = ''
 ): bool {
+}
+
+/**
+ * @param resource|object $session
+ */
+function ssh2_auth_agent(mixed $session, string $username): bool
+{
 }
 
 /**
@@ -56,6 +68,14 @@ function ssh2_channel_get_exit_status(mixed $channel): int|false
  * @param resource|object $channel
  */
 function ssh2_get_exit_status(mixed $channel): int|false
+{
+}
+
+/**
+ * @param resource|object $session
+ * @param int $flags
+ */
+function ssh2_fingerprint(mixed $session, int $flags = 0): string
 {
 }
 

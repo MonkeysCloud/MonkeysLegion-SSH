@@ -32,4 +32,12 @@ class PipelineResult
     {
         return !$this->succeeded();
     }
+
+    /**
+     * Returns true when the pipeline contained zero steps.
+     */
+    public function wasEmpty(): bool
+    {
+        return $this->results === [];
+    }
 }

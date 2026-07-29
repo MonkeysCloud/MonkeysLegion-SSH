@@ -5,14 +5,15 @@ namespace MonkeysLegion\SSH\Facades;
 use MonkeysLegion\SSH\Core\SSHManager;
 use MonkeysLegion\SSH\Core\ConnectionBuilder;
 use MonkeysLegion\SSH\Core\SSHConnection;
+use MonkeysLegion\SSH\SFTP\SFTPClient;
 use MonkeysLegion\SSH\Stream\CommandResult;
 use MonkeysLegion\SSH\Testing\FakeSSHConnection;
 use MonkeysLegion\SSH\Testing\SSHFakeRegistry;
 
 /**
  * @method static bool isConnected()
- * @method static CommandResult execute(string $command)
- * @method static SSHConnection sftp()
+ * @method static CommandResult execute(string $command, ?int $timeout = null)
+ * @method static SFTPClient sftp()
  * @method static void disconnect()
  */
 class SSH

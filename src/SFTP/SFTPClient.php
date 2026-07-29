@@ -29,12 +29,12 @@ class SFTPClient
             throw new \InvalidArgumentException(\sprintf('Local file does not exist: %s', $localPath));
         }
 
-        $content = \file_get_contents($localPath);
+        $content = @\file_get_contents($localPath);
         if ($content === false) {
             throw new \RuntimeException('Unable to read local file for upload.');
         }
 
-        $bytes = \file_put_contents($this->streamPath($remotePath), $content);
+        $bytes = @\file_put_contents($this->streamPath($remotePath), $content);
         if ($bytes === false) {
             throw new \RuntimeException('Unable to upload file via SFTP stream wrapper.');
         }
@@ -45,12 +45,17 @@ class SFTPClient
 
     public function download(string $remotePath, string $localPath): int
     {
-        $content = \file_get_contents($this->streamPath($remotePath));
+        $dir = \dirname($localPath);
+        if (!\is_dir($dir)) {
+            throw new \RuntimeException(\sprintf('Local directory does not exist: %s', $dir));
+        }
+
+        $content = @\file_get_contents($this->streamPath($remotePath));
         if ($content === false) {
             throw new \RuntimeException('Unable to read remote file via SFTP stream wrapper.');
         }
 
-        $bytes = \file_put_contents($localPath, $content);
+        $bytes = @\file_put_contents($localPath, $content);
         if ($bytes === false) {
             throw new \RuntimeException('Unable to write downloaded SFTP file locally.');
         }

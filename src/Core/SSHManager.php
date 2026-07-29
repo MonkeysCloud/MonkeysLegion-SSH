@@ -46,6 +46,7 @@ class SSHManager
                 throw new \InvalidArgumentException('SSH connections must be keyed by name and contain array profiles.');
             }
 
+            $this->validateProfile($name, $profile);
             $this->profiles[$name] = $profile;
         }
     }
@@ -54,6 +55,7 @@ class SSHManager
     {
         $name = $name ?? $this->defaultConnection;
 
+        // Return cached connection if available
         if (isset($this->connections[$name])) {
             return $this->connections[$name];
         }
@@ -76,6 +78,8 @@ class SSHManager
         if ($name === '') {
             throw new \InvalidArgumentException('Connection name must be non-empty.');
         }
+
+        $this->validateProfile($name, $profile);
 
         $this->profiles[$name] = $profile;
         unset($this->connections[$name]);
@@ -137,5 +141,32 @@ class SSHManager
     public function hasProfile(string $name): bool
     {
         return isset($this->profiles[$name]);
+    }
+
+    /**
+     * Validate that a profile has the required fields for connection resolution.
+     *
+     * @param string $name
+     * @param array<string, mixed> $profile
+     */
+    private function validateProfile(string $name, array $profile): void
+    {
+        $host = $profile['host'] ?? null;
+        if (!\is_string($host) || $host === '') {
+            throw new \InvalidArgumentException(\sprintf('Connection profile [%s] requires a non-empty host.', $name));
+        }
+
+        $username = $profile['username'] ?? null;
+        if (!\is_string($username) || $username === '') {
+            throw new \InvalidArgumentException(\sprintf('Connection profile [%s] requires a non-empty username.', $name));
+        }
+
+        $auth = $profile['auth'] ?? 'password';
+        if (!\is_string($auth) || !\in_array($auth, ['password', 'key', 'agent'], true)) {
+            throw new \InvalidArgumentException(\sprintf(
+                'Connection profile [%s] auth must be one of: password, key, agent.',
+                $name
+            ));
+        }
     }
 }

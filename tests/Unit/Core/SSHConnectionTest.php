@@ -7,6 +7,7 @@ use MonkeysLegion\SSH\Core\CommandPipeline;
 use MonkeysLegion\SSH\Core\SSHConnection;
 use MonkeysLegion\SSH\Exceptions\ConnectionException;
 use MonkeysLegion\SSH\Exceptions\ConnectionRefusedException;
+use MonkeysLegion\SSH\Exceptions\HostKeyMismatchException;
 use MonkeysLegion\SSH\Stream\StreamHandler;
 use PHPUnit\Framework\TestCase;
 
@@ -119,5 +120,64 @@ class SSHConnectionTest extends TestCase
 
         $this->expectException(ConnectionException::class);
         $connection->sftp();
+    }
+
+    public function test_connect_throws_when_fingerprint_does_not_match(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+
+        $sessionClosed = false;
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn (): mixed => $resource,
+            null,
+            null,
+            static function (mixed $res) use (&$sessionClosed): bool {
+                $sessionClosed = true;
+                return true;
+            },
+            static fn (): bool => false // fingerprint mismatch
+        );
+
+        $this->expectException(HostKeyMismatchException::class);
+        $connection->connect('10.0.0.1', 22, 1, 'expected:fingerprint');
+
+        // Session should be closed on fingerprint mismatch
+        $this->assertTrue($sessionClosed);
+    }
+
+    public function test_connect_succeeds_when_fingerprint_matches(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn (): mixed => $resource,
+            null,
+            null,
+            null,
+            static fn (): bool => true // fingerprint matches
+        );
+
+        $connection->connect('10.0.0.1', 22, 1, 'expected:fingerprint');
+        $this->assertTrue($connection->isConnected());
+        $connection->disconnect();
+    }
+
+    public function test_connect_throws_when_username_is_empty(): void
+    {
+        $auth = new PasswordAuthentication('password');
+        $connection = new SSHConnection($auth, '');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $connection->connect('127.0.0.1', 22, 1);
     }
 }

@@ -17,4 +17,9 @@ class AuthenticationFailedException extends AuthenticationException
             $privateKeyPath
         ));
     }
+
+    public static function agent(string $username): self
+    {
+        return new self(\sprintf('SSH agent authentication failed for user [%s].', $username));
+    }
 }

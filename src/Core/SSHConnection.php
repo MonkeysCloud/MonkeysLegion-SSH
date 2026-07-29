@@ -6,6 +6,7 @@ use MonkeysLegion\SSH\Authentication\AuthenticationDriver;
 use MonkeysLegion\SSH\Exceptions\AuthenticationFailedException;
 use MonkeysLegion\SSH\Exceptions\ConnectionException;
 use MonkeysLegion\SSH\Exceptions\ConnectionRefusedException;
+use MonkeysLegion\SSH\Exceptions\HostKeyMismatchException;
 use MonkeysLegion\SSH\SFTP\SFTPClient;
 use MonkeysLegion\SSH\Stream\CommandResult;
 use MonkeysLegion\SSH\Stream\StreamHandler;
@@ -31,15 +32,32 @@ class SSHConnection
      */
     private \Closure $closer;
 
+    /**
+     * @var \Closure(mixed): bool
+     */
+    private \Closure $sessionCloser;
+
+    /**
+     * @var \Closure(mixed, string): bool
+     */
+    private \Closure $fingerprintChecker;
+
+    private ?int $commandTimeout;
+    private int $maxOutputSize;
+
     public function __construct(
         private AuthenticationDriver $auth,
         private string $username = '',
         ?StreamHandler $streamHandler = null,
         ?callable $connector = null,
         ?callable $executor = null,
-        ?callable $closer = null
+        ?callable $closer = null,
+        ?callable $sessionCloser = null,
+        ?callable $fingerprintChecker = null,
+        ?int $commandTimeout = null,
+        int $maxOutputSize = 52428800, // 50 MB
     ) {
-        $this->streamHandler = $streamHandler ?? new StreamHandler();
+        $this->streamHandler = $streamHandler ?? new StreamHandler(maxOutputSize: $maxOutputSize);
         $this->connector = $connector !== null
             ? $connector(...)
             : $this->nativeConnector(...);
@@ -49,9 +67,17 @@ class SSHConnection
         $this->closer = $closer !== null
             ? $closer(...)
             : $this->nativeCloser(...);
+        $this->sessionCloser = $sessionCloser !== null
+            ? $sessionCloser(...)
+            : $this->nativeSessionCloser(...);
+        $this->fingerprintChecker = $fingerprintChecker !== null
+            ? $fingerprintChecker(...)
+            : $this->nativeFingerprintChecker(...);
+        $this->commandTimeout = $commandTimeout;
+        $this->maxOutputSize = $maxOutputSize;
     }
 
-    public function connect(string $host, int $port = 22, int $timeout = 10): self
+    public function connect(string $host, int $port = 22, int $timeout = 10, ?string $expectedFingerprint = null): self
     {
         if ($this->username === '') {
             throw new \InvalidArgumentException('Username must be provided before connecting.');
@@ -73,11 +99,22 @@ class SSHConnection
             throw ConnectionRefusedException::forHost($host, $port);
         }
 
+        // Verify host key fingerprint if one was provided
+        if ($expectedFingerprint !== null) {
+            $matches = ($this->fingerprintChecker)($resource, $expectedFingerprint);
+            if (!$matches) {
+                ($this->sessionCloser)($resource);
+                throw HostKeyMismatchException::forHost($host, $expectedFingerprint);
+            }
+        }
+
         try {
             $this->auth->authenticate($resource, $this->username);
         } catch (AuthenticationFailedException $exception) {
+            ($this->sessionCloser)($resource);
             throw $exception;
         } catch (\Throwable $exception) {
+            ($this->sessionCloser)($resource);
             throw new AuthenticationFailedException(
                 'SSH authentication failed.',
                 (int) $exception->getCode(),
@@ -89,13 +126,14 @@ class SSHConnection
         return $this;
     }
 
-    public function execute(string $command): CommandResult
+    public function execute(string $command, ?int $timeout = null): CommandResult
     {
         if (!$this->isConnected()) {
             throw new ConnectionException('SSH connection is not established.');
         }
 
-        $exitMarker = '__MLSSH_EXIT_CODE__';
+        // Generate a random exit-code marker per command to prevent false matches
+        $exitMarker = '__MLSSH_EXIT_' . \bin2hex(\random_bytes(8)) . '__';
         $wrappedCommand = \sprintf(
             'sh -lc %s',
             \escapeshellarg($command . '; printf "\n' . $exitMarker . '%s" "$?"')
@@ -106,8 +144,9 @@ class SSHConnection
             throw new ConnectionException('Unable to execute SSH command.');
         }
 
-        $output = $this->streamHandler->read($channel);
-        $error = $this->streamHandler->readError($channel);
+        $effectiveTimeout = $timeout ?? $this->commandTimeout;
+        $output = $this->streamHandler->read($channel, 8192, $effectiveTimeout, $this->maxOutputSize);
+        $error = $this->streamHandler->readError($channel, 8192, $effectiveTimeout, $this->maxOutputSize);
         $exitCode = $this->extractExitCode($output, $exitMarker);
         if ($exitCode === null) {
             try {
@@ -124,7 +163,7 @@ class SSHConnection
     public function disconnect(): void
     {
         if ($this->resource !== null) {
-            ($this->closer)($this->resource);
+            ($this->sessionCloser)($this->resource);
             $this->resource = null;
             $this->sftpClient = null;
         }
@@ -184,6 +223,34 @@ class SSHConnection
         }
 
         return true;
+    }
+
+    private function nativeSessionCloser(mixed $resource): bool
+    {
+        if (\is_resource($resource)) {
+            return \fclose($resource);
+        }
+
+        return true;
+    }
+
+    private function nativeFingerprintChecker(mixed $resource, string $expected): bool
+    {
+        if (!\is_resource($resource)) {
+            return false;
+        }
+
+        if (!\function_exists('ssh2_fingerprint')) {
+            throw new \RuntimeException('ssh2_fingerprint is not available; cannot verify host key.');
+        }
+
+        /** @var string|false $fingerprint */
+        $fingerprint = \ssh2_fingerprint($resource, \SSH2_FINGERPRINT_SHA1 | \SSH2_FINGERPRINT_HEX);
+        if ($fingerprint === false) {
+            throw new \RuntimeException('Unable to retrieve SSH host key fingerprint.');
+        }
+
+        return \hash_equals($expected, $fingerprint);
     }
 
     private function extractExitCode(string &$output, string $marker): ?int

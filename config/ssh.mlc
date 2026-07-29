@@ -9,6 +9,8 @@ ssh {
             auth => ${SSH_AUTH:-key} // password, key, agent
             private_key => ${SSH_PRIVATE_KEY:-'/home/user/.ssh/id_rsa'}
             passphrase => ${SSH_PASSPHRASE:-null}
+            fingerprint => ${SSH_FINGERPRINT:-null} // SHA1 hex fingerprint for host key verification
+            command_timeout => ${SSH_COMMAND_TIMEOUT:-null} // seconds, null = no timeout
             timeout => ${SSH_TIMEOUT:-10}
         }
 

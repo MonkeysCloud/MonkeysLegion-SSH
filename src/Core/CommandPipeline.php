@@ -35,9 +35,10 @@ class CommandPipeline
     {
         $results = [];
         $previous = null;
+        $state = $this->state; // local copy — does not mutate $this->state
 
         foreach ($this->steps as $index => $step) {
-            $command = \is_string($step) ? $step : $step($previous, $this->state);
+            $command = \is_string($step) ? $step : $step($previous, $state);
             if ($command === '') {
                 throw new \InvalidArgumentException('Pipeline step resolved to an empty command.');
             }
@@ -46,14 +47,14 @@ class CommandPipeline
             $result = $executor($command);
             $results[] = $result;
             $previous = $result;
-            $this->state['last_command'] = $command;
-            $this->state['last_exit_code'] = $result->exitCode;
+            $state['last_command'] = $command;
+            $state['last_exit_code'] = $result->exitCode;
 
             if ($haltOnFailure && $result->failed()) {
-                return new PipelineResult($results, true, $index, $this->state);
+                return new PipelineResult($results, true, $index, $state);
             }
         }
 
-        return new PipelineResult($results, false, null, $this->state);
+        return new PipelineResult($results, false, null, $state);
     }
 }
