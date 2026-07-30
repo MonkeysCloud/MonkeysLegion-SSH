@@ -17,6 +17,7 @@ class ConnectionBuilder
     private ?string $fingerprint = null;
     private ?int $commandTimeout = null;
     private int $maxOutputSize = 52428800; // 50 MB
+    private int $keepaliveInterval = 0;
 
     public function to(string $host): self
     {
@@ -87,6 +88,15 @@ class ConnectionBuilder
         return $this;
     }
 
+    public function keepalive(int $seconds): self
+    {
+        if ($seconds < 1) {
+            throw new \InvalidArgumentException('Keepalive interval must be at least 1 second.');
+        }
+        $this->keepaliveInterval = $seconds;
+        return $this;
+    }
+
     /**
      * @param array<string, mixed> $profile
      */
@@ -137,6 +147,12 @@ class ConnectionBuilder
             $this->maxOutputSize($this->coercePositiveInt($maxOutput, 'max_output_size'));
         }
 
+        // Optional keepalive interval
+        $keepalive = $profile['keepalive_interval'] ?? null;
+        if ($keepalive !== null) {
+            $this->keepalive($this->coercePositiveInt($keepalive, 'keepalive_interval'));
+        }
+
         return match ($auth) {
             'key' => $this->configureKeyAuth($profile),
             'agent' => $this->withAgent(),
@@ -163,6 +179,7 @@ class ConnectionBuilder
             $this->username,
             commandTimeout: $this->commandTimeout,
             maxOutputSize: $this->maxOutputSize,
+            keepaliveInterval: $this->keepaliveInterval,
         );
         $connection->connect($this->host, $this->port, $this->timeout, $this->fingerprint);
 

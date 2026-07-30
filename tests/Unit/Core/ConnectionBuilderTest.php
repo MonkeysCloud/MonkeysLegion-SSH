@@ -633,4 +633,53 @@ class ConnectionBuilderTest extends TestCase
 
         $this->assertSame($builder, $result);
     }
+
+    // ----- keepalive -----
+
+    public function test_keepalive_returns_self(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->assertSame($builder, $builder->keepalive(30));
+    }
+
+    public function test_keepalive_rejects_zero(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->expectException(\InvalidArgumentException::class);
+        $builder->keepalive(0);
+    }
+
+    public function test_keepalive_rejects_negative(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->expectException(\InvalidArgumentException::class);
+        $builder->keepalive(-1);
+    }
+
+    public function test_from_profile_accepts_keepalive_interval(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $result = $builder->fromProfile([
+            'host' => 'host',
+            'username' => 'user',
+            'auth' => 'password',
+            'password' => 'pass',
+            'keepalive_interval' => '45',
+        ]);
+
+        $this->assertSame($builder, $result);
+    }
+
+    public function test_from_profile_rejects_non_numeric_keepalive_interval(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->expectException(\InvalidArgumentException::class);
+        $builder->fromProfile([
+            'host' => 'host',
+            'username' => 'user',
+            'auth' => 'password',
+            'password' => 'pass',
+            'keepalive_interval' => 'abc',
+        ]);
+    }
 }

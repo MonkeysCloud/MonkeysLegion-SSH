@@ -44,8 +44,15 @@ class SSHConnection
      */
     private \Closure $fingerprintChecker;
 
+    /**
+     * @var \Closure(mixed): bool
+     */
+    private \Closure $keepaliveSender;
+
     private ?int $commandTimeout;
     private int $maxOutputSize;
+    private int $keepaliveInterval = 0;
+    private int $lastActivity = 0;
 
     public function __construct(
         private AuthenticationDriver $auth,
@@ -56,8 +63,10 @@ class SSHConnection
         ?callable $closer = null,
         ?callable $sessionCloser = null,
         ?callable $fingerprintChecker = null,
+        ?callable $keepaliveSender = null,
         ?int $commandTimeout = null,
-        int $maxOutputSize = 52428800, // 50 MB
+        int $maxOutputSize = 52428800,
+        int $keepaliveInterval = 0,
     ) {
         $this->streamHandler = $streamHandler ?? new StreamHandler(maxOutputSize: $maxOutputSize);
         $this->connector = $connector !== null
@@ -75,8 +84,12 @@ class SSHConnection
         $this->fingerprintChecker = $fingerprintChecker !== null
             ? $fingerprintChecker(...)
             : $this->nativeFingerprintChecker(...);
+        $this->keepaliveSender = $keepaliveSender !== null
+            ? $keepaliveSender(...)
+            : $this->nativeKeepaliveSender(...);
         $this->commandTimeout = $commandTimeout;
         $this->maxOutputSize = $maxOutputSize;
+        $this->keepaliveInterval = $keepaliveInterval;
     }
 
     public function connect(string $host, int $port = 22, int $timeout = 10, ?string $expectedFingerprint = null): self
@@ -125,6 +138,7 @@ class SSHConnection
         }
 
         $this->resource = $resource;
+        $this->updateActivity();
         return $this;
     }
 
@@ -133,6 +147,8 @@ class SSHConnection
         if (!$this->isConnected()) {
             throw new ConnectionException('SSH connection is not established.');
         }
+
+        $this->ensureAlive();
 
         // Generate a random exit-code marker per command to prevent false matches
         $exitMarker = '__MLSSH_EXIT_' . \bin2hex(\random_bytes(8)) . '__';
@@ -159,6 +175,7 @@ class SSHConnection
         }
 
         ($this->closer)($channel);
+        $this->updateActivity();
         return new CommandResult($output, $error, $exitCode);
     }
 
@@ -183,12 +200,14 @@ class SSHConnection
             throw new ConnectionException('SSH connection is not established.');
         }
 
+        $this->ensureAlive();
+
         if ($this->sftpClient !== null) {
             return $this->sftpClient;
         }
 
-        $this->sftpClient = new SFTPClient($this->resource);
-        return $this->sftpClient;
+        $this->updateActivity();
+        return $this->sftpClient = new SFTPClient($this->resource);
     }
 
     public function scp(): ScpClient
@@ -197,12 +216,14 @@ class SSHConnection
             throw new ConnectionException('SSH connection is not established.');
         }
 
+        $this->ensureAlive();
+
         if ($this->scpClient !== null) {
             return $this->scpClient;
         }
 
-        $this->scpClient = new ScpClient($this->resource);
-        return $this->scpClient;
+        $this->updateActivity();
+        return $this->scpClient = new ScpClient($this->resource);
     }
 
     public function pipeline(callable $configure, bool $haltOnFailure = true): PipelineResult
@@ -214,6 +235,42 @@ class SSHConnection
         }
 
         return $pipeline->run(fn (string $command): CommandResult => $this->execute($command), $haltOnFailure);
+    }
+
+    private function ensureAlive(): void
+    {
+        if ($this->keepaliveInterval < 1) {
+            return;
+        }
+
+        if (\time() - $this->lastActivity < $this->keepaliveInterval) {
+            return;
+        }
+
+        ($this->keepaliveSender)($this->resource);
+        $this->updateActivity();
+    }
+
+    private function updateActivity(): void
+    {
+        $this->lastActivity = \time();
+    }
+
+    private function nativeKeepaliveSender(mixed $resource): bool
+    {
+        if (!\is_resource($resource)) {
+            return false;
+        }
+
+        $channel = \ssh2_exec($resource, 'echo ping');
+        if ($channel === false || $channel === null || !\is_resource($channel)) {
+            return false;
+        }
+
+        \stream_get_contents($channel);
+        \fclose($channel);
+
+        return true;
     }
 
     /**

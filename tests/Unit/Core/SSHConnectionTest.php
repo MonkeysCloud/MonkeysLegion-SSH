@@ -180,4 +180,111 @@ class SSHConnectionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $connection->connect('127.0.0.1', 22, 1);
     }
+
+    // ----- keepalive -----
+
+    public function test_keepalive_sends_ping_when_idle_before_execute(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $pingCalled = false;
+        $streamHandler = $this->createMock(StreamHandler::class);
+        $streamHandler->method('read')->willReturn("out\n");
+        $streamHandler->method('readError')->willReturn('');
+        $streamHandler->method('getExitStatus')->willReturn(0);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            $streamHandler,
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            null,
+            null,
+            static function (mixed $res) use (&$pingCalled): bool {
+                $pingCalled = true;
+                return true;
+            },
+            keepaliveInterval: 1,
+        );
+        $connection->connect('localhost');
+
+        // Wait for keepalive interval to elapse
+        \sleep(1);
+
+        $connection->execute('echo test');
+        $this->assertTrue($pingCalled);
+        $connection->disconnect();
+    }
+
+    public function test_keepalive_does_not_ping_before_interval(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $pingCalled = 0;
+        $streamHandler = $this->createMock(StreamHandler::class);
+        $streamHandler->method('read')->willReturn("out\n");
+        $streamHandler->method('readError')->willReturn('');
+        $streamHandler->method('getExitStatus')->willReturn(0);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            $streamHandler,
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            null,
+            null,
+            static function (mixed $res) use (&$pingCalled): bool {
+                ++$pingCalled;
+                return true;
+            },
+            keepaliveInterval: 3600, // 1 hour — won't trigger
+        );
+        $connection->connect('localhost');
+
+        $connection->execute('echo test');
+        $this->assertSame(0, $pingCalled);
+        $connection->disconnect();
+    }
+
+    public function test_keepalive_disabled_by_default(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $pingCalled = 0;
+        $streamHandler = $this->createMock(StreamHandler::class);
+        $streamHandler->method('read')->willReturn("out\n");
+        $streamHandler->method('readError')->willReturn('');
+        $streamHandler->method('getExitStatus')->willReturn(0);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            $streamHandler,
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+        );
+        $connection->connect('localhost');
+
+        $connection->execute('echo test');
+        $this->assertSame(0, $pingCalled);
+        $connection->disconnect();
+    }
+
 }
