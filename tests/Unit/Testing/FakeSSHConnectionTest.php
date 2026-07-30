@@ -248,4 +248,66 @@ class FakeSSHConnectionTest extends TestCase
 
         $this->assertInstanceOf(PipelineResult::class, $result);
     }
+
+    public function test_channel_throws_in_fake_mode(): void
+    {
+        $registry = new SSHFakeRegistry();
+        $connection = new FakeSSHConnection($registry);
+
+        $this->expectException(ConnectionException::class);
+        $this->expectExceptionMessage('Channel is not available in fake mode.');
+        $connection->channel('whoami');
+    }
+
+    public function test_shell_throws_in_fake_mode(): void
+    {
+        $registry = new SSHFakeRegistry();
+        $connection = new FakeSSHConnection($registry);
+
+        $this->expectException(ConnectionException::class);
+        $this->expectExceptionMessage('Shell is not available in fake mode.');
+        $connection->shell();
+    }
+
+    public function test_tunnel_throws_in_fake_mode(): void
+    {
+        $registry = new SSHFakeRegistry();
+        $connection = new FakeSSHConnection($registry);
+
+        $this->expectException(ConnectionException::class);
+        $this->expectExceptionMessage('Tunnel is not available in fake mode.');
+        $connection->tunnel('localhost', 3306);
+    }
+
+    public function test_scp_throws_in_fake_mode(): void
+    {
+        $registry = new SSHFakeRegistry();
+        $connection = new FakeSSHConnection($registry);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SCP is not available in fake mode.');
+        $connection->scp();
+    }
+
+    public function test_scp_throws_when_disconnected(): void
+    {
+        $registry = new SSHFakeRegistry();
+        $connection = new FakeSSHConnection($registry);
+
+        $connection->disconnect();
+
+        $this->expectException(ConnectionException::class);
+        $this->expectExceptionMessage('SSH fake connection is disconnected.');
+        $connection->scp();
+    }
+
+    public function test_proxy_to_throws_in_fake_mode(): void
+    {
+        $registry = new SSHFakeRegistry();
+        $connection = new FakeSSHConnection($registry);
+
+        $this->expectException(ConnectionException::class);
+        $this->expectExceptionMessage('Proxy is not available in fake mode.');
+        $connection->proxyTo('target', 'user');
+    }
 }

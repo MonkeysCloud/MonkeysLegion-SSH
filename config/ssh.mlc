@@ -5,22 +5,28 @@ ssh {
         production {
             host = ${SSH_HOST:-127.0.0.1}
             port = ${SSH_PORT:-22}
-            username => ${SSH_USERNAME:-forge}
-            auth => ${SSH_AUTH:-key} // password, key, agent
-            private_key => ${SSH_PRIVATE_KEY:-'/home/user/.ssh/id_rsa'}
-            passphrase => ${SSH_PASSPHRASE:-null}
-            fingerprint => ${SSH_FINGERPRINT:-null} // SHA1 hex fingerprint for host key verification
-            command_timeout => ${SSH_COMMAND_TIMEOUT:-null} // seconds, null = no timeout
-            timeout => ${SSH_TIMEOUT:-10}
+            username = ${SSH_USERNAME:-forge}
+            auth = ${SSH_AUTH:-key}           // password, key, agent
+            private_key = ${SSH_PRIVATE_KEY:-'/home/user/.ssh/id_rsa'}
+            passphrase = ${SSH_PASSPHRASE:-''}
+            password = ${SSH_PASSWORD:-''}
+            fingerprint = ${SSH_FINGERPRINT:-''}  // SHA1 hex fingerprint
+            timeout = ${SSH_TIMEOUT:-10}
+            command_timeout = ${SSH_COMMAND_TIMEOUT:-0}   // seconds, 0 = no limit
+            max_output_size = ${SSH_MAX_OUTPUT:-52428800}  // 50 MB
+            keepalive_interval = ${SSH_KEEPALIVE:-0}       // seconds, 0 = disabled
+            term_type = ${SSH_TERM_TYPE:-xterm-256color}
+            pty_width = ${SSH_PTY_WIDTH:-80}
+            pty_height = ${SSH_PTY_HEIGHT:-25}
         }
 
         development {
             host = 127.0.0.1
-            port => 22
-            username => dev
-            auth => password
-            password => ${SSH_PASSWORD:-'dev-password'}
-            timeout => ${SSH_TIMEOUT:-10}
+            port = 22
+            username = dev
+            auth = password
+            password = ${SSH_PASSWORD:-dev-password}
+            timeout = ${SSH_TIMEOUT:-10}
         }
     }
 }

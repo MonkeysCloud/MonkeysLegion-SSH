@@ -15,7 +15,7 @@ $checks = [
     ],
     'PHPUnit' => [
         'cmd' => [$bin . '/phpunit', '--colors=always', '--no-coverage'],
-        'pass' => '292 tests, clean',
+        'pass' => '317 tests, clean',
         'fail' => 'tests failed',
     ],
     'Infection' => [

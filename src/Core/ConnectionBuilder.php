@@ -18,6 +18,19 @@ class ConnectionBuilder
     private ?int $commandTimeout = null;
     private int $maxOutputSize = 52428800; // 50 MB
     private int $keepaliveInterval = 0;
+    private ?string $termType = null;
+    private int $ptyWidth = 80;
+    private int $ptyHeight = 25;
+
+    /** @return array{term_type: ?string, width: int, height: int} */
+    public function ptyConfig(): array
+    {
+        return [
+            'term_type' => $this->termType,
+            'width' => $this->ptyWidth,
+            'height' => $this->ptyHeight,
+        ];
+    }
 
     public function to(string $host): self
     {
@@ -102,6 +115,10 @@ class ConnectionBuilder
         if ($width < 1 || $height < 1) {
             throw new \InvalidArgumentException('PTY dimensions must be positive.');
         }
+
+        $this->termType = $termType;
+        $this->ptyWidth = $width;
+        $this->ptyHeight = $height;
 
         return $this;
     }

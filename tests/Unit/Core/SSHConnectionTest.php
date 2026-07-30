@@ -153,6 +153,27 @@ class SSHConnectionTest extends TestCase
         $this->assertTrue($sessionClosed);
     }
 
+    public function test_connect_throws_when_fingerprint_checker_returns_false(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn (): mixed => $resource,
+            null,
+            null,
+            null,
+            static fn (mixed $res, string $expected): bool => false,
+        );
+
+        $this->expectException(HostKeyMismatchException::class);
+        $connection->connect('10.0.0.1', 22, 1, 'aa:bb:cc:dd');
+    }
+
     public function test_connect_succeeds_when_fingerprint_matches(): void
     {
         $resource = \fopen('php://temp', 'rb+');
@@ -934,6 +955,44 @@ class SSHConnectionTest extends TestCase
 
         $this->assertTrue($sessionClosed);
         $this->assertFalse($connection->isConnected());
+    }
+
+    public function test_keepalive_silent_on_failure(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $keepaliveCalled = 0;
+        $streamHandler = $this->createMock(StreamHandler::class);
+        $streamHandler->method('read')->willReturn("out\n");
+        $streamHandler->method('readError')->willReturn('');
+        $streamHandler->method('getExitStatus')->willReturn(0);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            $streamHandler,
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            null,
+            null,
+            static function (mixed $res) use (&$keepaliveCalled): bool {
+                $keepaliveCalled++;
+                return false;
+            },
+            keepaliveInterval: 1,
+        );
+        $connection->connect('localhost');
+
+        \sleep(1);
+        $result = $connection->execute('echo test');
+        $this->assertSame(0, $result->exitCode);
+        $this->assertSame(1, $keepaliveCalled);
+        $connection->disconnect();
     }
 
     public function test_keepalive_disabled_by_default(): void

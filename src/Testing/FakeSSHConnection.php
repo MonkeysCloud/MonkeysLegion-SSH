@@ -6,8 +6,12 @@ use MonkeysLegion\SSH\Core\CommandPipeline;
 use MonkeysLegion\SSH\Core\PipelineResult;
 use MonkeysLegion\SSH\Core\SSHConnection;
 use MonkeysLegion\SSH\Exceptions\ConnectionException;
+use MonkeysLegion\SSH\SFTP\ScpClient;
 use MonkeysLegion\SSH\SFTP\SFTPClient;
+use MonkeysLegion\SSH\Stream\CommandChannel;
 use MonkeysLegion\SSH\Stream\CommandResult;
+use MonkeysLegion\SSH\Stream\ShellSession;
+use MonkeysLegion\SSH\Stream\Tunnel;
 
 class FakeSSHConnection extends SSHConnection
 {
@@ -69,6 +73,37 @@ class FakeSSHConnection extends SSHConnection
     public function setFakeSftp(?SFTPClient $sftp): void
     {
         $this->fakeSftp = $sftp;
+    }
+
+    public function channel(string $command): CommandChannel
+    {
+        throw new ConnectionException('Channel is not available in fake mode.');
+    }
+
+    public function shell(?string $termType = null, int $width = 80, int $height = 25): ShellSession
+    {
+        throw new ConnectionException('Shell is not available in fake mode.');
+    }
+
+    public function tunnel(string $host, int $port): Tunnel
+    {
+        throw new ConnectionException('Tunnel is not available in fake mode.');
+    }
+
+    public function scp(): ScpClient
+    {
+        if (!$this->connected) {
+            throw new ConnectionException('SSH fake connection is disconnected.');
+        }
+
+        throw new \RuntimeException(
+            'SCP is not available in fake mode. Instantiate ScpClient directly with a mock session resource.',
+        );
+    }
+
+    public function proxyTo(string $targetHost, string $targetUser, int $targetPort = 22): SSHConnection
+    {
+        throw new ConnectionException('Proxy is not available in fake mode. Use SSHConnection with a real bastion connection.');
     }
 
     public function pipeline(callable $configure, bool $haltOnFailure = true): PipelineResult
