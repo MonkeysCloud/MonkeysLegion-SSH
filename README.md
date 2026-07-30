@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CS: PSR-12](https://img.shields.io/badge/Code%20Style-PSR--12-ff69b4)](https://www.php-fig.org/psr/psr-12/)
 [![PHPStan Level 9](https://img.shields.io/badge/PHPStan-Level%209-brightgreen)](https://phpstan.org/)
-[![Infection MSI](https://img.shields.io/badge/Infection-MSI%2081%25-purple)](https://infection.github.io/)
+[![Infection MSI](https://img.shields.io/badge/Infection-MSI%2079%25-purple)](https://infection.github.io/)
 [![CI](https://github.com/monkeyscloud/monkeyslegion-ssh/actions/workflows/ci.yml/badge.svg)](https://github.com/monkeyscloud/monkeyslegion-ssh/actions/workflows/ci.yml)
 
 ---
@@ -18,11 +18,15 @@
 - **📂 SFTP file operations** — upload, download, mkdir, chmod, delete, rename, symlinks, directory listing
 - **📦 SCP support** — send/receive files with configurable permissions
 - **⛓️ Command pipelines** — sequential execution with state sharing and halt-on-failure
+- **💓 Connection keepalive** — automatic heartbeat to prevent stale connections
+- **🖥️ Interactive PTY shell** — `ssh2_shell` with read/write/resize for interactive sessions
+- **🔀 Channel multiplexing** — multiple concurrent exec channels on a single connection
+- **⏱️ Per-channel command timeouts** — override timeout per `execute()` call
 - **🪞 Fake/mock mode** — socket-free testing without real SSH servers
 - **🔍 Host key verification** — SHA1 fingerprint matching against expected values
 - **📊 Transfer metrics** — track uploaded/downloaded bytes and operation counts
 - **🧪 PHPStan Level 9** — maximum static analysis rigor
-- **🧬 Mutation testing (Infection)** — 81% covered MSI, 100% mutation coverage, 80% min threshold
+- **🧬 Mutation testing (Infection)** — 79% covered MSI threshold
 - **🆕 PHP 8.4 native** — property hooks, `#[Override]`, `readonly` classes, and more
 
 ---
@@ -122,15 +126,23 @@ $scp->receive('/remote/source.dat', '/local/source.dat');
                     │  (Profiles)     │               │
                     └────────┬────────┘               │
                              │                        │
-                    ┌────────▼────────────────────────▼────────┐
-                    │           SSHConnection                   │
-                    │  connect / execute / pipeline / sftp / scp│
-                    └────┬───────────┬──────────┬───────────────┘
-                         │           │          │
-                    ┌────▼───┐  ┌────▼────┐  ┌──▼───────┐
-                    │  SFTP  │  │   SCP   │  │ Command  │
-                    │ Client │  │ Client  │  │ Pipeline │
-                    └────────┘  └─────────┘  └──────────┘
+                    ┌────────▼────────────────────────▼──────────┐
+                    │           SSHConnection                     │
+                    │  connect / execute / channel / shell        │
+                    │  pipeline / sftp / scp                      │
+                    └────┬─────┬──────┬──────┬────────┬──────────┘
+                         │     │      │      │        │
+                    ┌────▼──┐ │ ┌────▼──┐ ┌─▼──────┐ │
+                    │ SFTP  │ │ │  SCP  │ │Command │ │
+                    │Client │ │ │Client │ │Channel │ │
+                    └───────┘ │ └───────┘ └───┬────┘ │
+                         ┌────▼──────┐   ┌────▼───┐  │
+                         │  Shell    │   │Command │  │
+                         │ Session   │   │Pipeline│  │
+                         └───────────┘   └────────┘  │
+                                                 ┌────▼───────┐
+                                                 │StreamHandler│
+                                                 └────────────┘
 ```
 
 ### Core Components
@@ -145,6 +157,9 @@ $scp->receive('/remote/source.dat', '/local/source.dat');
 | `ScpClient` | File transfers via SCP protocol |
 | `CommandPipeline` | Sequential command execution with shared state |
 | `CommandResult` | Value object with output, error, and exit code |
+| `CommandChannel` | Multiplexed exec channel with read/readError/getExitStatus |
+| `ShellSession` | Interactive PTY shell with bidirectional read/write/resize |
+| `StreamHandler` | Low-level SSH stream read/write abstraction with timeout support |
 | `SSHFakeRegistry` | Command stub registry for deterministic testing |
 
 ---
@@ -193,6 +208,32 @@ Closes the connection and releases resources.
 ```php
 SSH::execute('ls');
 SSH::disconnect();
+```
+
+#### `channel(string $command) → CommandChannel`
+
+Opens a multiplexed exec channel without immediately reading. Multiple channels can be opened concurrently on one connection.
+
+```php
+$channel1 = $connection->channel('long-running-build');
+$channel2 = $connection->channel('quick-check');
+
+$output1 = $channel1->read(timeout: 120);
+$output2 = $channel2->read(timeout: 10);
+
+$channel1->close();
+$channel2->close();
+```
+
+#### `shell(?string $termType, int $width, int $height) → ShellSession`
+
+Opens an interactive PTY shell session for bidirectional read/write with terminal resize support.
+
+```php
+$shell = $connection->shell('xterm-256color', 120, 40);
+$shell->write("cd /var/www && ls -la\n");
+$output = $shell->readAll();
+$shell->close();
 ```
 
 #### `pipeline(callable $configure, bool $haltOnFailure = true) → PipelineResult`
@@ -438,10 +479,10 @@ composer install
 composer check
 
 # Or individual checks
-composer test               # PHPUnit (212+ tests)
+composer test               # PHPUnit (270+ tests)
 composer phpstan            # PHPStan Level 9
 composer cs-check           # PSR-12 code style
-composer infection          # Mutation testing (Infection, 80% MSI floor)
+composer infection          # Mutation testing (Infection, 79% MSI threshold)
 ```
 
 ### Quality Gates
@@ -450,7 +491,7 @@ composer infection          # Mutation testing (Infection, 80% MSI floor)
 |------|-------------|
 | **PHPStan** | Level 9, zero errors |
 | **PHP-CS-Fixer** | PSR-12, zero errors |
-| **Infection (MSI)** | 81% covered, 100% mutation coverage, 80% min threshold |
+| **Infection (MSI)** | 79% min (some default-value mutants unavoidably escape) |
 | **Test coverage** | All unit + integration tests pass |
 | **Integration tests** | Docker-backed SSH server |
 

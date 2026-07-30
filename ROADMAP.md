@@ -5,11 +5,11 @@
 - SFTP `rename`, `stat`, `symlink`, `file_exists`
 - SCP support
 
-## v0.3.0 — Connection & Transport
+## v0.3.0 — Connection & Transport ✅
 - Connection keepalive / heartbeat
 - Interactive PTY shell (`ssh2_shell`)
 - Per-channel command timeouts
-- Channel multiplexing (reuse connection for multiple exec channels)
+- Channel multiplexing (concurrent exec channels)
 
 ## v0.4.0 — Advanced Networking
 - Local / remote port forwarding (tunnels)

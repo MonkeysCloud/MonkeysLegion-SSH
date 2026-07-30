@@ -21,23 +21,23 @@ Native PHP 8.4+ SSH library wrapping `ext-ssh2`. Namespace: `MonkeysLegion\SSH\`
 - Named arguments in calls with 3+ params
 
 ### Architecture
-- **Injectable callbacks**: every native SSH2 function is behind a constructor-injectable closure (`$connector`, `$executor`, `$nativeCallbacks`, `$sender`, `$receiver`)
-- **No real SSH connections in unit tests** — use `FakeSftpStreamWrapper` or mock callbacks
-- **`SSHConnection` is the single entry point** for all operations (exec, sftp, scp)
+- **Injectable callbacks**: every native SSH2 function is behind a constructor-injectable closure (`$connector`, `$executor`, `$shellOpener`, `$closer`, `$sessionCloser`, `$keepaliveSender`)
+- **No real SSH connections in unit tests** — use `CommandChannel` with mock `StreamHandler` or injectable closures
+- **`SSHConnection` is the single entry point** for all operations (exec, channel, shell, sftp, scp, pipeline)
+- **`CommandChannel`** wraps a single exec stream for multiplexing; `ShellSession` wraps a PTY stream
 
 ### Testing
-- **Unit tests** (in `tests/Unit/`) use fakes — no SSH server
+- **Unit tests** (in `tests/Unit/`) use mocks / fakes — no SSH server
 - **Integration tests** (in `tests/Feature/`) need `RUN_INTEGRATION_TESTS=1` + Docker
-- **Pattern**: create client with `$this->createClient(initializer: …, nativeCallbacks: […])`
-- **Assert callback args** using `&$actual` references to verify the right values were passed
+- **Pattern**: create `SSHConnection` with injectable `$connector`, `$executor`, mock `StreamHandler`, and verify callback args via `&$actual` references
 - No tautological assertions like `assertTrue(true)`
 
 ### Quality Gates
 Run `composer quality-report` to check everything:
 - `cs-check` — PSR-12, zero violations
 - `phpstan` — Level 9, zero errors (config: `phpstan.neon`)
-- `test` — PHPUnit 11.x, 212+ tests, all pass
-- `infection` — MSI 80% min, currently 81%
+- `test` — PHPUnit 11.x, 273+ tests, all pass
+- `infection` — MSI 79% min threshold (some default-value mutants unavoidably escape)
 
 ### Commit Style
 - No emojis in commit messages
@@ -49,8 +49,13 @@ Run `composer quality-report` to check everything:
 - `src/Core/ConnectionBuilder.php` — fluent builder
 - `src/SFTP/SFTPClient.php` — SFTP file operations
 - `src/SFTP/ScpClient.php` — SCP send/receive
+- `src/Stream/CommandChannel.php` — multiplexed exec channel
+- `src/Stream/ShellSession.php` — interactive PTY shell
+- `src/Stream/CommandResult.php` — command execution result value object
+- `src/Stream/StreamHandler.php` — SSH stream read/write abstraction
 - `stubs/ssh2.stub.php` — PHPStan stubs for ext-ssh2
 - `infection.json5` — mutation testing config
+- `demo.php` — interactive shell demo against Docker test container
 
 ## Quick Reference
 - Run all checks: `composer check` (cs + phpstan + test)

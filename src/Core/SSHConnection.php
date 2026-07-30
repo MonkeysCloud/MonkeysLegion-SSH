@@ -9,6 +9,7 @@ use MonkeysLegion\SSH\Exceptions\ConnectionRefusedException;
 use MonkeysLegion\SSH\Exceptions\HostKeyMismatchException;
 use MonkeysLegion\SSH\SFTP\ScpClient;
 use MonkeysLegion\SSH\SFTP\SFTPClient;
+use MonkeysLegion\SSH\Stream\CommandChannel;
 use MonkeysLegion\SSH\Stream\CommandResult;
 use MonkeysLegion\SSH\Stream\ShellSession;
 use MonkeysLegion\SSH\Stream\StreamHandler;
@@ -152,7 +153,7 @@ class SSHConnection
         return $this;
     }
 
-    public function execute(string $command, ?int $timeout = null): CommandResult
+    public function channel(string $command): CommandChannel
     {
         if (!$this->isConnected()) {
             throw new ConnectionException('SSH connection is not established.');
@@ -160,6 +161,17 @@ class SSHConnection
 
         $this->ensureAlive();
 
+        $channel = ($this->executor)($this->resource, $command);
+        if ($channel === false || $channel === null) {
+            throw new ConnectionException('Unable to execute SSH command.');
+        }
+
+        $this->updateActivity();
+        return new CommandChannel($channel, $this->streamHandler, $this->closer, $this->maxOutputSize);
+    }
+
+    public function execute(string $command, ?int $timeout = null): CommandResult
+    {
         // Generate a random exit-code marker per command to prevent false matches
         $exitMarker = '__MLSSH_EXIT_' . \bin2hex(\random_bytes(8)) . '__';
         $wrappedCommand = \sprintf(
@@ -167,24 +179,21 @@ class SSHConnection
             \escapeshellarg($command . '; printf "\n' . $exitMarker . '%s" "$?"'),
         );
 
-        $channel = ($this->executor)($this->resource, $wrappedCommand);
-        if ($channel === false || $channel === null) {
-            throw new ConnectionException('Unable to execute SSH command.');
-        }
+        $cmdChannel = $this->channel($wrappedCommand);
 
         $effectiveTimeout = $timeout ?? $this->commandTimeout;
-        $output = $this->streamHandler->read($channel, 8192, $effectiveTimeout, $this->maxOutputSize);
-        $error = $this->streamHandler->readError($channel, 8192, $effectiveTimeout, $this->maxOutputSize);
+        $output = $cmdChannel->read($effectiveTimeout);
+        $error = $cmdChannel->readError($effectiveTimeout);
         $exitCode = $this->extractExitCode($output, $exitMarker);
         if ($exitCode === null) {
             try {
-                $exitCode = $this->streamHandler->getExitStatus($channel);
+                $exitCode = $cmdChannel->getExitStatus();
             } catch (\RuntimeException) {
                 $exitCode = -1;
             }
         }
 
-        ($this->closer)($channel);
+        $cmdChannel->close();
         $this->updateActivity();
         return new CommandResult($output, $error, $exitCode);
     }
