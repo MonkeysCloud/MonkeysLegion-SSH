@@ -38,7 +38,7 @@ jobs:
           php-version: '8.4'
           extensions: ssh2
           tools: composer:latest
-          coverage: none
+          coverage: pcov
 
       - name: Get composer cache directory
         id: composer-cache
