@@ -639,15 +639,23 @@ class SFTPClientTest extends TestCase
     public function test_rename_moves_file(): void
     {
         $handle = \fopen('php://temp', 'rb+');
+        $actualFrom = null;
+        $actualTo = null;
         $client = $this->createClient(
             initializer: static fn (): mixed => $handle,
             nativeCallbacks: [
-                'rename' => static fn (mixed $h, string $from, string $to): bool => true,
+                'rename' => static function (mixed $h, string $from, string $to) use (&$actualFrom, &$actualTo): bool {
+                    $actualFrom = $from;
+                    $actualTo = $to;
+                    return true;
+                },
             ],
         );
 
         $client->rename('/old.txt', '/new.txt');
-        $this->assertTrue(true);
+
+        $this->assertSame('/old.txt', $actualFrom);
+        $this->assertSame('/new.txt', $actualTo);
     }
 
     public function test_rename_throws_on_failure(): void
@@ -824,8 +832,7 @@ class SFTPClientTest extends TestCase
         $entries = $client->ls('absolute');
         $this->assertSame(['file.txt'], $entries);
 
-        $info = $client->stat('absolute/file.txt');
-        $this->assertIsArray($info);
+        $client->stat('absolute/file.txt');
     }
 
     // ----- security: path traversal -----

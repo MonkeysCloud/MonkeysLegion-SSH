@@ -13,7 +13,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_builder_can_be_chained(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->to('localhost')
             ->port(22)
             ->as('user')
@@ -24,49 +24,49 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_with_key_returns_self(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
 
         $this->assertSame($builder, $builder->withKey('/path/to/key'));
     }
 
     public function test_with_agent_returns_self(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
 
         $this->assertSame($builder, $builder->withAgent());
     }
 
     public function test_timeout_returns_self(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
 
         $this->assertSame($builder, $builder->timeout(30));
     }
 
     public function test_with_fingerprint_returns_self(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
 
         $this->assertSame($builder, $builder->withFingerprint('aa:bb:cc'));
     }
 
     public function test_command_timeout_returns_self(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
 
         $this->assertSame($builder, $builder->commandTimeout(60));
     }
 
     public function test_command_timeout_accepts_null(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
 
         $this->assertSame($builder, $builder->commandTimeout(null));
     }
 
     public function test_max_output_size_returns_self(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
 
         $this->assertSame($builder, $builder->maxOutputSize(1024));
     }
@@ -100,7 +100,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_port_accepts_boundary_values(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
 
         $this->assertSame($builder, $builder->port(1));
         $this->assertSame($builder, $builder->port(65535));
@@ -248,7 +248,7 @@ class ConnectionBuilderTest extends TestCase
     public function test_from_profile_defaults_to_password_auth(): void
     {
         // No explicit auth key — should default to password
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -325,7 +325,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_with_key_auth_accepts_null_passphrase(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -339,7 +339,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_with_agent_auth(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -351,7 +351,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_with_unknown_auth_defaults_to_password(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -368,7 +368,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_accepts_fingerprint(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -410,7 +410,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_accepts_command_timeout(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -424,7 +424,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_accepts_command_timeout_as_string(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -466,7 +466,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_accepts_max_output_size(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -480,7 +480,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_accepts_max_output_size_as_string(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -512,7 +512,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_accepts_port_as_string(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -554,7 +554,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_accepts_timeout_as_string(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -600,7 +600,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_uses_default_port_and_timeout(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
@@ -617,7 +617,7 @@ class ConnectionBuilderTest extends TestCase
 
     public function test_from_profile_with_all_optional_fields(): void
     {
-        $builder = new ConnectionBuilder();
+        $builder = (new ConnectionBuilder());
         $result = $builder->fromProfile([
             'host' => 'production.example.com',
             'username' => 'deploy',

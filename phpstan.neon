@@ -1,7 +1,2 @@
-parameters:
-    level: 9
-    paths:
-        - src
-        - tests
-    scanFiles:
-        - stubs/ssh2.stub.php
+includes:
+    - phpstan.neon.dist

@@ -2,14 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main]
 
 jobs:
-  test:
+  quality:
     runs-on: ubuntu-latest
-    
+
     services:
       ssh-server:
         image: lscr.io/linuxserver/openssh-server:latest
@@ -38,24 +38,30 @@ jobs:
           php-version: '8.4'
           extensions: ssh2
           tools: composer:latest
+          coverage: none
 
-      - name: Cache Composer packages
+      - name: Get composer cache directory
         id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache composer dependencies
         uses: actions/cache@v4
         with:
-          path: vendor
-          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-php-
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-composer-
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
 
+      - name: Check code style (PSR-12)
+        run: composer cs-check
+
+      - name: Static analysis (PHPStan Level 9)
+        run: composer phpstan
+
       - name: Run unit tests
         run: composer test
-
-      - name: Run static analysis (PHPStan level 9)
-        run: composer phpstan
 
       - name: Wait for SSH server
         run: |

@@ -46,6 +46,7 @@ class SSHManager
                 throw new \InvalidArgumentException('SSH connections must be keyed by name and contain array profiles.');
             }
 
+            /** @var array<string, mixed> $profile */
             $this->validateProfile($name, $profile);
             $this->profiles[$name] = $profile;
         }
@@ -97,6 +98,7 @@ class SSHManager
                 throw new \InvalidArgumentException('registerMany expects profiles keyed by connection name.');
             }
 
+            /** @var array<string, mixed> $profile */
             $this->register($name, $profile);
         }
 

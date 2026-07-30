@@ -33,6 +33,7 @@ class CommandPipelineTest extends TestCase
             ->withState('target', 'world')
             ->add('echo hello')
             ->add(static function (?CommandResult $previous, array $state): string {
+                \assert(\is_string($state['target'] ?? null));
                 return $previous?->isSuccessful() === true
                     ? 'echo ' . $state['target']
                     : 'echo fallback';

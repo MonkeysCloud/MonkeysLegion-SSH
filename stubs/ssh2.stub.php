@@ -75,7 +75,7 @@ function ssh2_get_exit_status(mixed $channel): int|false
  * @param resource|object $session
  * @param int $flags
  */
-function ssh2_fingerprint(mixed $session, int $flags = 0): string
+function ssh2_fingerprint(mixed $session, int $flags = 0): string|false
 {
 }
 
