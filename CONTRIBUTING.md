@@ -68,7 +68,8 @@ This runs:
 
 1. `composer cs-check` — PSR-12 code style
 2. `composer phpstan` — PHPStan Level 9 static analysis
-3. `composer test` — PHPUnit test suite
+3. `composer infection` — Mutation testing (Infection, 80% MSI floor)
+4. `composer test` — PHPUnit test suite
 
 ---
 
@@ -80,6 +81,7 @@ This runs:
 | **Code Style** | [PSR-12](https://www.php-fig.org/psr/psr-12/) |
 | **Autoloading** | [PSR-4](https://www.php-fig.org/psr/psr-4/) |
 | **Static Analysis** | PHPStan Level 9 |
+| **Mutation Testing** | Infection, 81% covered MSI, 80% min threshold |
 | **Testing** | PHPUnit 11.x |
 | **Type System** | Strict types everywhere, native PHP 8.4 features preferred |
 
@@ -175,6 +177,7 @@ composer cs-fix
 ### PR checklist
 
 - [ ] I have run `composer check` and all checks pass
+- [ ] I have run `composer infection` and not lowered the MSI
 - [ ] I have added/updated tests to cover my changes
 - [ ] I have updated documentation (README, docblocks) as needed
 - [ ] My code follows PSR-12 and project conventions
