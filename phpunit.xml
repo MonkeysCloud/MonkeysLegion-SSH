@@ -22,4 +22,9 @@
             <directory suffix=".php">src</directory>
         </include>
     </source>
+    <coverage>
+        <report>
+            <xml outputDirectory="build/coverage"/>
+        </report>
+    </coverage>
 </phpunit>

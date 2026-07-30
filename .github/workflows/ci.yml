@@ -63,6 +63,9 @@ jobs:
       - name: Run unit tests
         run: composer test
 
+      - name: Mutation testing (Infection)
+        run: composer infection
+
       - name: Wait for SSH server
         run: |
           for i in {1..30}; do
