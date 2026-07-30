@@ -3,11 +3,13 @@
 **Native PHP 8.4+ SSH library** with a fluent, type-safe API wrapping `ext-ssh2`. Built for modern server management, deployment pipelines, and secure remote operations.
 
 [![PHP Version](https://img.shields.io/badge/PHP-8.4%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/releases/8.4/)
+[![Latest Stable Version](https://img.shields.io/packagist/v/monkeyscloud/monkeyslegion-ssh?logo=packagist&logoColor=white)](https://packagist.org/packages/monkeyscloud/monkeyslegion-ssh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CS: PSR-12](https://img.shields.io/badge/Code%20Style-PSR--12-ff69b4)](https://www.php-fig.org/psr/psr-12/)
 [![PHPStan Level 9](https://img.shields.io/badge/PHPStan-Level%209-brightgreen)](https://phpstan.org/)
 [![Infection MSI](https://img.shields.io/badge/Infection-MSI%2079%25-purple)](https://infection.github.io/)
 [![CI](https://github.com/monkeyscloud/monkeyslegion-ssh/actions/workflows/ci.yml/badge.svg)](https://github.com/monkeyscloud/monkeyslegion-ssh/actions/workflows/ci.yml)
+[![Total Downloads](https://img.shields.io/packagist/dt/monkeyscloud/monkeyslegion-ssh)](https://packagist.org/packages/monkeyscloud/monkeyslegion-ssh)
 
 ---
 
@@ -168,6 +170,7 @@ $scp->receive('/remote/source.dat', '/local/source.dat');
 | `Tunnel` | Direct TCP tunnel stream through SSH with read/write/close |
 | `StreamHandler` | Low-level SSH stream read/write abstraction with timeout support |
 | `SSHFakeRegistry` | Command stub registry for deterministic testing |
+| `SSHServiceProvider` | Service provider for MonkeysLegion DI container integration |
 
 ---
 

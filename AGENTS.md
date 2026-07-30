@@ -55,6 +55,7 @@ Run `composer quality-report` to check everything:
 - `src/Stream/Tunnel.php` — TCP tunnel through SSH
 - `src/Stream/CommandResult.php` — command execution result value object
 - `src/Stream/StreamHandler.php` — SSH stream read/write abstraction
+- `src/SSHServiceProvider.php` — MonkeysLegion DI container service provider
 - `stubs/ssh2.stub.php` — PHPStan stubs for ext-ssh2
 - `infection.json5` — mutation testing config
 - `demo.php` — interactive shell demo against Docker test container

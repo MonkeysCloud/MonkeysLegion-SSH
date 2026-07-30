@@ -15,7 +15,7 @@
 - TCP tunnels (`ssh2_tunnel`)
 - Jump host / bastion proxy support (`proxyTo`)
 
-## v0.5.0 — Ecosystem & DX
+## v0.5.0 — Ecosystem & DX ✅
 - MonkeysLegion service provider (auto-discovery)
 - README badges (Packagist, CI, PHP version)
 - `CONTRIBUTING.md` / `SECURITY.md` / issue templates

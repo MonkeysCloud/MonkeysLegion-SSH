@@ -68,7 +68,7 @@ This runs:
 
 1. `composer cs-check` — PSR-12 code style
 2. `composer phpstan` — PHPStan Level 9 static analysis
-3. `composer infection` — Mutation testing (Infection, 80% MSI floor)
+3. `composer infection` — Mutation testing (Infection, 79% MSI threshold)
 4. `composer test` — PHPUnit test suite
 
 ---
@@ -81,7 +81,7 @@ This runs:
 | **Code Style** | [PSR-12](https://www.php-fig.org/psr/psr-12/) |
 | **Autoloading** | [PSR-4](https://www.php-fig.org/psr/psr-4/) |
 | **Static Analysis** | PHPStan Level 9 |
-| **Mutation Testing** | Infection, 81% covered MSI, 80% min threshold |
+| **Mutation Testing** | Infection, 79% min MSI threshold |
 | **Testing** | PHPUnit 11.x |
 | **Type System** | Strict types everywhere, native PHP 8.4 features preferred |
 
@@ -98,19 +98,22 @@ This runs:
 ## Architecture Overview
 
 ```
-SSH::fake()          SSH Facade          ConnectionBuilder
-   │                     │                     │
-   └────────────┬────────┘─────────────┬───────┘
-                │                      │
-          SSHManager             SSHConnection
-         (Profiles)          (execute / sftp / scp)
-                                   │
-                        ┌──────────┼──────────┐
-                        │          │          │
-                    SFTPClient  ScpClient  CommandPipeline
+SSH::fake()          SSH Facade            ConnectionBuilder
+   │                     │                       │
+   └────────────┬────────┘───────────┬───────────┘
+                │                    │
+          SSHManager           SSHConnection
+         (Profiles)        (exec / channel / shell
+                           tunnel / sftp / scp /
+                           pipeline / proxyTo)
+                              │
+            ┌────────┬────────┼────────┬────────┐
+            │        │        │        │        │
+        SFTPClient  SCP  CommandChannel  Shell  Tunnel
+                   Client              Session
 ```
 
-The library wraps `ext-ssh2` native functions behind injectable callbacks, enabling unit testing without real SSH connections. Every native function (connect, exec, sftp, scp) has a corresponding injectable closure.
+The library wraps `ext-ssh2` native functions behind injectable callbacks, enabling unit testing without real SSH connections. Every native function (connect, exec, sftp, scp, shell, tunnel) has a corresponding injectable closure.
 
 ---
 
@@ -152,7 +155,7 @@ This ensures:
 
 We follow **PSR-12** with the following additional conventions:
 
-- **Strict types**: Every file should use `declare(strict_types=1);`
+- **Strict types**: No `declare(strict_types=1)` — enforced by project conventions
 - **No `echo` or `var_dump`** in library code
 - **Named arguments** preferred for clarity in method calls with 3+ parameters
 - **`match` expressions** preferred over `switch` statements
