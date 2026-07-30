@@ -110,6 +110,12 @@ class ConnectionBuilderTest extends TestCase
     // Timeout validation
     // ----------------------------------------------------------------
 
+    public function test_timeout_accepts_one(): void
+    {
+        $builder = new ConnectionBuilder();
+        $this->assertSame($builder, $builder->timeout(1));
+    }
+
     public function test_timeout_rejects_zero(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -128,6 +134,12 @@ class ConnectionBuilderTest extends TestCase
     // ----------------------------------------------------------------
     // Max output size validation
     // ----------------------------------------------------------------
+
+    public function test_max_output_size_accepts_one(): void
+    {
+        $builder = new ConnectionBuilder();
+        $this->assertSame($builder, $builder->maxOutputSize(1));
+    }
 
     public function test_max_output_size_rejects_zero(): void
     {
@@ -642,6 +654,12 @@ class ConnectionBuilderTest extends TestCase
         $this->assertSame($builder, $builder->keepalive(30));
     }
 
+    public function test_keepalive_accepts_one(): void
+    {
+        $builder = new ConnectionBuilder();
+        $this->assertSame($builder, $builder->keepalive(1));
+    }
+
     public function test_keepalive_rejects_zero(): void
     {
         $builder = (new ConnectionBuilder());
@@ -680,6 +698,91 @@ class ConnectionBuilderTest extends TestCase
             'auth' => 'password',
             'password' => 'pass',
             'keepalive_interval' => 'abc',
+        ]);
+    }
+
+    // ----- PTY / shell -----
+
+    public function test_with_pty_returns_self(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->assertSame($builder, $builder->withPty('xterm-256color', 120, 40));
+    }
+
+    public function test_with_pty_rejects_zero_width(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->expectException(\InvalidArgumentException::class);
+        $builder->withPty('xterm', 0, 25);
+    }
+
+    public function test_with_pty_rejects_zero_height(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->expectException(\InvalidArgumentException::class);
+        $builder->withPty('xterm', 80, 0);
+    }
+
+    public function test_with_pty_accepts_minimum_dimensions(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->assertSame($builder, $builder->withPty('xterm', 1, 1));
+    }
+
+    public function test_from_profile_accepts_term_type(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $result = $builder->fromProfile([
+            'host' => 'host',
+            'username' => 'user',
+            'auth' => 'password',
+            'password' => 'pass',
+            'term_type' => 'xterm-256color',
+        ]);
+
+        $this->assertSame($builder, $result);
+    }
+
+    public function test_from_profile_accepts_term_type_with_dimensions(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $result = $builder->fromProfile([
+            'host' => 'host',
+            'username' => 'user',
+            'auth' => 'password',
+            'password' => 'pass',
+            'term_type' => 'xterm-256color',
+            'pty_width' => '120',
+            'pty_height' => '40',
+        ]);
+
+        $this->assertSame($builder, $result);
+    }
+
+    public function test_from_profile_rejects_non_string_term_type(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->expectException(\InvalidArgumentException::class);
+        $builder->fromProfile([
+            'host' => 'host',
+            'username' => 'user',
+            'auth' => 'password',
+            'password' => 'pass',
+            'term_type' => 42,
+        ]);
+    }
+
+    public function test_from_profile_rejects_non_numeric_pty_width(): void
+    {
+        $builder = (new ConnectionBuilder());
+        $this->expectException(\InvalidArgumentException::class);
+        $builder->fromProfile([
+            'host' => 'host',
+            'username' => 'user',
+            'auth' => 'password',
+            'password' => 'pass',
+            'term_type' => 'xterm',
+            'pty_width' => 'abc',
         ]);
     }
 }

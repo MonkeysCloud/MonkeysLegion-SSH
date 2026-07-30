@@ -97,6 +97,15 @@ class ConnectionBuilder
         return $this;
     }
 
+    public function withPty(?string $termType = 'xterm-256color', int $width = 80, int $height = 25): self
+    {
+        if ($width < 1 || $height < 1) {
+            throw new \InvalidArgumentException('PTY dimensions must be positive.');
+        }
+
+        return $this;
+    }
+
     /**
      * @param array<string, mixed> $profile
      */
@@ -151,6 +160,19 @@ class ConnectionBuilder
         $keepalive = $profile['keepalive_interval'] ?? null;
         if ($keepalive !== null) {
             $this->keepalive($this->coercePositiveInt($keepalive, 'keepalive_interval'));
+        }
+
+        // Optional PTY settings
+        $termType = $profile['term_type'] ?? null;
+        if ($termType !== null) {
+            if (!\is_string($termType)) {
+                throw new \InvalidArgumentException('Connection profile contains an invalid term_type.');
+            }
+
+            $ptyWidth = isset($profile['pty_width']) ? $this->coercePositiveInt($profile['pty_width'], 'pty_width') : 80;
+            $ptyHeight = isset($profile['pty_height']) ? $this->coercePositiveInt($profile['pty_height'], 'pty_height') : 25;
+
+            $this->withPty($termType, $ptyWidth, $ptyHeight);
         }
 
         return match ($auth) {

@@ -50,6 +50,14 @@ function ssh2_exec(mixed $session, string $command, ?string $pty = null, array $
 }
 
 /**
+ * @param resource|object $session
+ * @return resource|object|false
+ */
+function ssh2_shell(mixed $session, ?string $term_type = null, array $env = [], int $width = 80, int $height = 25, int $width_height_type = SSH2_TERM_UNIT_CHARS): mixed
+{
+}
+
+/**
  * @param resource|object $channel
  * @return resource|object|false
  */
@@ -76,6 +84,13 @@ function ssh2_get_exit_status(mixed $channel): int|false
  * @param int $flags
  */
 function ssh2_fingerprint(mixed $session, int $flags = 0): string|false
+{
+}
+
+/**
+ * @param resource|object $session
+ */
+function ssh2_disconnect(mixed $session): bool
 {
 }
 

@@ -8,6 +8,7 @@ use MonkeysLegion\SSH\Core\SSHConnection;
 use MonkeysLegion\SSH\Exceptions\ConnectionException;
 use MonkeysLegion\SSH\Exceptions\ConnectionRefusedException;
 use MonkeysLegion\SSH\Exceptions\HostKeyMismatchException;
+use MonkeysLegion\SSH\Stream\ShellSession;
 use MonkeysLegion\SSH\Stream\StreamHandler;
 use PHPUnit\Framework\TestCase;
 
@@ -256,6 +257,208 @@ class SSHConnectionTest extends TestCase
         $connection->execute('echo test');
         $this->assertSame(0, $pingCalled);
         $connection->disconnect();
+    }
+
+    // ----- shell -----
+
+    public function test_shell_returns_shell_session(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            null,
+            null,
+            null,
+            static fn (): mixed => $channel,
+        );
+        $connection->connect('localhost');
+
+        $shell = $connection->shell('xterm-256color', 120, 40);
+        $this->assertInstanceOf(ShellSession::class, $shell);
+        $this->assertSame(120, $shell->width());
+        $this->assertSame(40, $shell->height());
+        $shell->close();
+        $connection->disconnect();
+    }
+
+    public function test_shell_uses_injectable_shell_opener(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $actualTermType = null;
+        $actualWidth = null;
+        $actualHeight = null;
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            null,
+            null,
+            null,
+            static function (mixed $res, ?string $termType, int $width, int $height) use (&$actualTermType, &$actualWidth, &$actualHeight, &$channel): mixed {
+                $actualTermType = $termType;
+                $actualWidth = $width;
+                $actualHeight = $height;
+                return $channel;
+            },
+        );
+        $connection->connect('localhost');
+
+        $shell = $connection->shell('xterm-256color', 80, 25);
+        $this->assertSame('xterm-256color', $actualTermType);
+        $this->assertSame(80, $actualWidth);
+        $this->assertSame(25, $actualHeight);
+        $shell->close();
+        $connection->disconnect();
+    }
+
+    public function test_shell_returns_session_with_writeable_channel(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            null,
+            null,
+            null,
+            static fn (): mixed => $channel,
+        );
+        $connection->connect('localhost');
+
+        $shell = $connection->shell();
+
+        \fwrite($channel, "terminal output\n");
+        \rewind($channel);
+
+        $output = $shell->read(4096, 0);
+        $this->assertStringContainsString('terminal output', $output);
+        $shell->close();
+        $connection->disconnect();
+    }
+
+    public function test_shell_throws_when_not_connected(): void
+    {
+        $auth = new PasswordAuthentication('password');
+        $connection = new SSHConnection($auth, 'remote-user');
+
+        $this->expectException(ConnectionException::class);
+        $connection->shell();
+    }
+
+    public function test_shell_throws_when_opener_returns_false(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            null,
+            null,
+            null,
+            static fn (): false => false,
+        );
+        $connection->connect('localhost');
+
+        $this->expectException(ConnectionException::class);
+        $connection->shell();
+        $connection->disconnect();
+    }
+
+    public function test_shell_with_keepalive_triggers_ping(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $pingCalled = 0;
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            null,
+            null,
+            static function (mixed $res) use (&$pingCalled): bool {
+                ++$pingCalled;
+                return true;
+            },
+            static fn (): mixed => $channel,
+            keepaliveInterval: 1,
+        );
+        $connection->connect('localhost');
+
+        \sleep(1);
+
+        $shell = $connection->shell();
+        $this->assertInstanceOf(ShellSession::class, $shell);
+        $this->assertSame(1, $pingCalled);
+        $shell->close();
+        $connection->disconnect();
+    }
+
+    public function test_disconnect_closes_session_resource(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+
+        $sessionClosed = false;
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn (): mixed => $resource,
+            null,
+            null,
+            static function (mixed $res) use (&$sessionClosed): bool {
+                $sessionClosed = true;
+                return true;
+            },
+        );
+        $connection->connect('localhost');
+        $connection->disconnect();
+
+        $this->assertTrue($sessionClosed);
+        $this->assertFalse($connection->isConnected());
     }
 
     public function test_keepalive_disabled_by_default(): void

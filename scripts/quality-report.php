@@ -15,12 +15,12 @@ $checks = [
     ],
     'PHPUnit' => [
         'cmd' => [$bin . '/phpunit', '--colors=always', '--no-coverage'],
-        'pass' => '212 tests, clean',
+        'pass' => '251 tests, clean',
         'fail' => 'tests failed',
     ],
     'Infection' => [
         'cmd' => 'XDEBUG_MODE=coverage php -d zend.assertions=1 ' . $bin . '/infection --threads=4 --no-progress',
-        'pass' => 'MSI 81%, clean',
+        'pass' => 'MSI within threshold',
         'fail' => 'MSI below threshold',
     ],
 ];

@@ -10,6 +10,7 @@ use MonkeysLegion\SSH\Exceptions\HostKeyMismatchException;
 use MonkeysLegion\SSH\SFTP\ScpClient;
 use MonkeysLegion\SSH\SFTP\SFTPClient;
 use MonkeysLegion\SSH\Stream\CommandResult;
+use MonkeysLegion\SSH\Stream\ShellSession;
 use MonkeysLegion\SSH\Stream\StreamHandler;
 
 class SSHConnection
@@ -49,6 +50,11 @@ class SSHConnection
      */
     private \Closure $keepaliveSender;
 
+    /**
+     * @var \Closure(mixed, ?string, int, int): mixed
+     */
+    private \Closure $shellOpener;
+
     private ?int $commandTimeout;
     private int $maxOutputSize;
     private int $keepaliveInterval = 0;
@@ -64,6 +70,7 @@ class SSHConnection
         ?callable $sessionCloser = null,
         ?callable $fingerprintChecker = null,
         ?callable $keepaliveSender = null,
+        ?callable $shellOpener = null,
         ?int $commandTimeout = null,
         int $maxOutputSize = 52428800,
         int $keepaliveInterval = 0,
@@ -87,6 +94,9 @@ class SSHConnection
         $this->keepaliveSender = $keepaliveSender !== null
             ? $keepaliveSender(...)
             : $this->nativeKeepaliveSender(...);
+        $this->shellOpener = $shellOpener !== null
+            ? $shellOpener(...)
+            : $this->nativeShellOpener(...);
         $this->commandTimeout = $commandTimeout;
         $this->maxOutputSize = $maxOutputSize;
         $this->keepaliveInterval = $keepaliveInterval;
@@ -226,6 +236,24 @@ class SSHConnection
         return $this->scpClient = new ScpClient($this->resource);
     }
 
+    public function shell(?string $termType = 'xterm-256color', int $width = 80, int $height = 25): ShellSession
+    {
+        if (!$this->isConnected()) {
+            throw new ConnectionException('SSH connection is not established.');
+        }
+
+        $this->ensureAlive();
+
+        $channel = ($this->shellOpener)($this->resource, $termType, $width, $height);
+        if ($channel === false || $channel === null) {
+            throw new ConnectionException('Unable to open interactive shell session.');
+        }
+
+        $this->updateActivity();
+
+        return new ShellSession($channel, $this->closer, $width, $height);
+    }
+
     public function pipeline(callable $configure, bool $haltOnFailure = true): PipelineResult
     {
         $pipeline = new CommandPipeline();
@@ -254,6 +282,15 @@ class SSHConnection
     private function updateActivity(): void
     {
         $this->lastActivity = \time();
+    }
+
+    private function nativeShellOpener(mixed $resource, ?string $termType, int $width, int $height): mixed
+    {
+        if (!\is_resource($resource)) {
+            throw new ConnectionException('SSH connection resource is invalid.');
+        }
+
+        return \ssh2_shell($resource, $termType);
     }
 
     private function nativeKeepaliveSender(mixed $resource): bool
@@ -302,7 +339,7 @@ class SSHConnection
     private function nativeSessionCloser(mixed $resource): bool
     {
         if (\is_resource($resource)) {
-            return \fclose($resource);
+            return \ssh2_disconnect($resource);
         }
 
         return true;
