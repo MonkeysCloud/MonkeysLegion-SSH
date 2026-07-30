@@ -1,6 +1,6 @@
 # Roadmap
 
-## v0.2.0 — File Operations
+## v0.2.0 — File Operations ✅
 - SFTP directory listing (`ls` / `nlist` / `rawlist`)
 - SFTP `rename`, `stat`, `symlink`, `file_exists`
 - SCP support
@@ -11,9 +11,9 @@
 - Per-channel command timeouts
 - Channel multiplexing (concurrent exec channels)
 
-## v0.4.0 — Advanced Networking
-- Local / remote port forwarding (tunnels)
-- Jump host / bastion proxy support
+## v0.4.0 — Advanced Networking ✅
+- TCP tunnels (`ssh2_tunnel`)
+- Jump host / bastion proxy support (`proxyTo`)
 
 ## v0.5.0 — Ecosystem & DX
 - MonkeysLegion service provider (auto-discovery)

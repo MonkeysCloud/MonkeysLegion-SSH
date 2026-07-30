@@ -149,6 +149,30 @@ function ssh2_sftp_readlink(mixed $sftp, string $link): string|false
 
 /**
  * @param resource|object $session
+ * @return resource|object|false
+ */
+function ssh2_tunnel(mixed $session, string $host, int $port): mixed
+{
+}
+
+/**
+ * @param resource|object $session
+ * @return resource|object|false
+ */
+function ssh2_forward_listen(mixed $session, int $port, ?string $host = null, int $maxConnections = 16): mixed
+{
+}
+
+/**
+ * @param resource|object $listener
+ * @return resource|object|false
+ */
+function ssh2_forward_accept(mixed $listener): mixed
+{
+}
+
+/**
+ * @param resource|object $session
  */
 function ssh2_scp_send(mixed $session, string $local_file, string $remote_file, int $create_mode = 0o644): bool
 {

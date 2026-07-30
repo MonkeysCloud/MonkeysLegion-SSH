@@ -21,10 +21,11 @@ Native PHP 8.4+ SSH library wrapping `ext-ssh2`. Namespace: `MonkeysLegion\SSH\`
 - Named arguments in calls with 3+ params
 
 ### Architecture
-- **Injectable callbacks**: every native SSH2 function is behind a constructor-injectable closure (`$connector`, `$executor`, `$shellOpener`, `$closer`, `$sessionCloser`, `$keepaliveSender`)
+- **Injectable callbacks**: every native SSH2 function is behind a constructor-injectable closure (`$connector`, `$executor`, `$shellOpener`, `$tunnelOpener`, `$closer`, `$sessionCloser`, `$keepaliveSender`)
 - **No real SSH connections in unit tests** — use `CommandChannel` with mock `StreamHandler` or injectable closures
-- **`SSHConnection` is the single entry point** for all operations (exec, channel, shell, sftp, scp, pipeline)
-- **`CommandChannel`** wraps a single exec stream for multiplexing; `ShellSession` wraps a PTY stream
+- **`SSHConnection` is the single entry point** for all operations (exec, channel, shell, tunnel, sftp, scp, pipeline, proxyTo)
+- **`CommandChannel`** wraps a single exec stream for multiplexing; `ShellSession` wraps a PTY stream; `Tunnel` wraps a TCP tunnel stream
+- **`proxyTo()`** returns a proxied `SSHConnection` that routes commands through a bastion/jump host
 
 ### Testing
 - **Unit tests** (in `tests/Unit/`) use mocks / fakes — no SSH server
@@ -36,7 +37,7 @@ Native PHP 8.4+ SSH library wrapping `ext-ssh2`. Namespace: `MonkeysLegion\SSH\`
 Run `composer quality-report` to check everything:
 - `cs-check` — PSR-12, zero violations
 - `phpstan` — Level 9, zero errors (config: `phpstan.neon`)
-- `test` — PHPUnit 11.x, 273+ tests, all pass
+- `test` — PHPUnit 11.x, 292+ tests, all pass
 - `infection` — MSI 79% min threshold (some default-value mutants unavoidably escape)
 
 ### Commit Style
@@ -51,6 +52,7 @@ Run `composer quality-report` to check everything:
 - `src/SFTP/ScpClient.php` — SCP send/receive
 - `src/Stream/CommandChannel.php` — multiplexed exec channel
 - `src/Stream/ShellSession.php` — interactive PTY shell
+- `src/Stream/Tunnel.php` — TCP tunnel through SSH
 - `src/Stream/CommandResult.php` — command execution result value object
 - `src/Stream/StreamHandler.php` — SSH stream read/write abstraction
 - `stubs/ssh2.stub.php` — PHPStan stubs for ext-ssh2

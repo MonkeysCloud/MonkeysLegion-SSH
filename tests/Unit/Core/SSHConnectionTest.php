@@ -11,6 +11,7 @@ use MonkeysLegion\SSH\Exceptions\HostKeyMismatchException;
 use MonkeysLegion\SSH\Stream\CommandChannel;
 use MonkeysLegion\SSH\Stream\ShellSession;
 use MonkeysLegion\SSH\Stream\StreamHandler;
+use MonkeysLegion\SSH\Stream\Tunnel;
 use PHPUnit\Framework\TestCase;
 
 class SSHConnectionTest extends TestCase
@@ -467,6 +468,270 @@ class SSHConnectionTest extends TestCase
         $cmd1->close();
         $cmd2->close();
         $connection->disconnect();
+    }
+
+    // ----- tunnel -----
+
+    public function test_tunnel_returns_tunnel_instance(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $tunnelStream = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($tunnelStream);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            static fn () => $tunnelStream,
+        );
+        $connection->connect('localhost');
+
+        $tunnel = $connection->tunnel('internal.db', 5432);
+        $this->assertInstanceOf(Tunnel::class, $tunnel);
+        $this->assertTrue($tunnel->isOpen());
+        $tunnel->close();
+        $connection->disconnect();
+    }
+
+    public function test_tunnel_passes_host_and_port_to_opener(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $tunnelStream = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($tunnelStream);
+
+        $actualHost = null;
+        $actualPort = null;
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            static function (mixed $res, string $host, int $port) use (&$actualHost, &$actualPort, $tunnelStream): mixed {
+                $actualHost = $host;
+                $actualPort = $port;
+                return $tunnelStream;
+            },
+        );
+        $connection->connect('localhost');
+
+        $tunnel = $connection->tunnel('internal.db', 5432);
+        $this->assertSame('internal.db', $actualHost);
+        $this->assertSame(5432, $actualPort);
+        $tunnel->close();
+        $connection->disconnect();
+    }
+
+    public function test_tunnel_throws_when_not_connected(): void
+    {
+        $auth = new PasswordAuthentication('password');
+        $connection = new SSHConnection($auth, 'remote-user');
+
+        $this->expectException(ConnectionException::class);
+        $connection->tunnel('host', 22);
+    }
+
+    public function test_tunnel_throws_when_opener_returns_false(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            static fn (): false => false,
+        );
+        $connection->connect('localhost');
+
+        $this->expectException(ConnectionException::class);
+        $this->expectExceptionMessage('Unable to open tunnel to host:22.');
+        $connection->tunnel('host', 22);
+        $connection->disconnect();
+    }
+
+    public function test_tunnel_with_keepalive_triggers_ping(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $tunnelStream = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($tunnelStream);
+
+        $pingCalled = 0;
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $connection = new SSHConnection(
+            $auth,
+            'remote-user',
+            new StreamHandler(),
+            static fn () => $resource,
+            null,
+            null,
+            null,
+            null,
+            static function (mixed $res) use (&$pingCalled): bool {
+                ++$pingCalled;
+                return true;
+            },
+            null,
+            static fn () => $tunnelStream,
+            keepaliveInterval: 1,
+        );
+        $connection->connect('localhost');
+
+        \sleep(1);
+
+        $tunnel = $connection->tunnel('db', 3306);
+        $this->assertSame(1, $pingCalled);
+        $tunnel->close();
+        $connection->disconnect();
+    }
+
+    // ----- bastion proxy -----
+
+    public function test_proxy_to_returns_connection_targeting_remote_host(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $streamHandler = $this->createMock(StreamHandler::class);
+        $streamHandler->method('read')->willReturn("ok\n");
+        $streamHandler->method('readError')->willReturn('');
+        $streamHandler->method('getExitStatus')->willReturn(0);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $bastion = new SSHConnection(
+            $auth,
+            'bastion-user',
+            $streamHandler,
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+        );
+        $bastion->connect('bastion-host');
+
+        $proxy = $bastion->proxyTo('target-host', 'target-user', 2222);
+        $this->assertTrue($proxy->isConnected());
+        $proxy->disconnect();
+        $bastion->disconnect();
+    }
+
+    public function test_proxy_to_execute_runs_ssh_on_bastion(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $executedCommands = [];
+
+        $streamHandler = $this->createMock(StreamHandler::class);
+        $streamHandler->method('read')->willReturn("ok\n");
+        $streamHandler->method('readError')->willReturn('');
+        $streamHandler->method('getExitStatus')->willReturn(0);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $bastion = new SSHConnection(
+            $auth,
+            'bastion-user',
+            $streamHandler,
+            static fn () => $resource,
+            static function (mixed $session, string $command) use (&$executedCommands, $channel): mixed {
+                $executedCommands[] = $command;
+                return $channel;
+            },
+            static fn (): bool => true,
+        );
+        $bastion->connect('bastion-host');
+
+        $proxy = $bastion->proxyTo('target-host', 'target-user', 2222);
+        $result = $proxy->execute('whoami');
+
+        $this->assertSame(0, $result->exitCode);
+        $this->assertCount(1, $executedCommands);
+        $this->assertStringContainsString('ssh', $executedCommands[0]);
+        $this->assertStringContainsString('target-user', $executedCommands[0]);
+        $this->assertStringContainsString('target-host', $executedCommands[0]);
+        $this->assertStringContainsString('-p 2222', $executedCommands[0]);
+        $this->assertStringContainsString('whoami', $executedCommands[0]);
+
+        $proxy->disconnect();
+        $bastion->disconnect();
+    }
+
+    public function test_proxy_to_throws_when_bastion_not_connected(): void
+    {
+        $auth = new PasswordAuthentication('password');
+        $bastion = new SSHConnection($auth, 'bastion-user');
+
+        $this->expectException(ConnectionException::class);
+        $bastion->proxyTo('target-host', 'target-user');
+    }
+
+    public function test_proxy_to_disconnect_does_not_close_bastion(): void
+    {
+        $resource = \fopen('php://temp', 'rb+');
+        $channel = \fopen('php://temp', 'rb+');
+        $this->assertIsResource($resource);
+        $this->assertIsResource($channel);
+
+        $sessionClosed = false;
+        $streamHandler = $this->createMock(StreamHandler::class);
+        $streamHandler->method('read')->willReturn("ok\n");
+        $streamHandler->method('readError')->willReturn('');
+        $streamHandler->method('getExitStatus')->willReturn(0);
+
+        $auth = new PasswordAuthentication('password', static fn (): bool => true);
+        $bastion = new SSHConnection(
+            $auth,
+            'bastion-user',
+            $streamHandler,
+            static fn () => $resource,
+            static fn () => $channel,
+            static fn (): bool => true,
+            static function (mixed $res) use (&$sessionClosed): bool {
+                $sessionClosed = true;
+                if (\is_resource($res)) {
+                    \fclose($res);
+                }
+                return true;
+            },
+        );
+        $bastion->connect('bastion-host');
+
+        $proxy = $bastion->proxyTo('target-host', 'target-user');
+        $proxy->disconnect();
+
+        $this->assertFalse($sessionClosed, 'Proxy disconnect should not close the bastion session.');
+        $this->assertTrue($bastion->isConnected());
+        $bastion->disconnect();
     }
 
     // ----- shell -----

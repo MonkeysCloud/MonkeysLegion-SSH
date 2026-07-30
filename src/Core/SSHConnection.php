@@ -13,6 +13,7 @@ use MonkeysLegion\SSH\Stream\CommandChannel;
 use MonkeysLegion\SSH\Stream\CommandResult;
 use MonkeysLegion\SSH\Stream\ShellSession;
 use MonkeysLegion\SSH\Stream\StreamHandler;
+use MonkeysLegion\SSH\Stream\Tunnel;
 
 class SSHConnection
 {
@@ -56,10 +57,19 @@ class SSHConnection
      */
     private \Closure $shellOpener;
 
+    /**
+     * @var \Closure(mixed, string, int): mixed
+     */
+    private \Closure $tunnelOpener;
+
     private ?int $commandTimeout;
     private int $maxOutputSize;
     private int $keepaliveInterval = 0;
     private int $lastActivity = 0;
+
+    private ?self $bastionConnection = null;
+    private string $bastionTargetHost = '';
+    private int $bastionTargetPort = 22;
 
     public function __construct(
         private AuthenticationDriver $auth,
@@ -72,6 +82,7 @@ class SSHConnection
         ?callable $fingerprintChecker = null,
         ?callable $keepaliveSender = null,
         ?callable $shellOpener = null,
+        ?callable $tunnelOpener = null,
         ?int $commandTimeout = null,
         int $maxOutputSize = 52428800,
         int $keepaliveInterval = 0,
@@ -98,6 +109,9 @@ class SSHConnection
         $this->shellOpener = $shellOpener !== null
             ? $shellOpener(...)
             : $this->nativeShellOpener(...);
+        $this->tunnelOpener = $tunnelOpener !== null
+            ? $tunnelOpener(...)
+            : $this->nativeTunnelOpener(...);
         $this->commandTimeout = $commandTimeout;
         $this->maxOutputSize = $maxOutputSize;
         $this->keepaliveInterval = $keepaliveInterval;
@@ -155,6 +169,18 @@ class SSHConnection
 
     public function channel(string $command): CommandChannel
     {
+        if ($this->bastionConnection !== null) {
+            $wrappedCommand = \sprintf(
+                'ssh -o StrictHostKeyChecking=no -p %d %s@%s %s',
+                $this->bastionTargetPort,
+                \escapeshellarg($this->username),
+                \escapeshellarg($this->bastionTargetHost),
+                \escapeshellarg($command),
+            );
+
+            return $this->bastionConnection->channel($wrappedCommand);
+        }
+
         if (!$this->isConnected()) {
             throw new ConnectionException('SSH connection is not established.');
         }
@@ -200,6 +226,11 @@ class SSHConnection
 
     public function disconnect(): void
     {
+        if ($this->bastionConnection !== null) {
+            $this->bastionConnection = null;
+            return;
+        }
+
         if ($this->resource !== null) {
             ($this->sessionCloser)($this->resource);
             $this->resource = null;
@@ -210,6 +241,10 @@ class SSHConnection
 
     public function isConnected(): bool
     {
+        if ($this->bastionConnection !== null) {
+            return $this->bastionConnection->isConnected();
+        }
+
         return $this->resource !== null;
     }
 
@@ -263,6 +298,45 @@ class SSHConnection
         return new ShellSession($channel, $this->closer, $width, $height);
     }
 
+    public function tunnel(string $host, int $port): Tunnel
+    {
+        if (!$this->isConnected()) {
+            throw new ConnectionException('SSH connection is not established.');
+        }
+
+        $this->ensureAlive();
+
+        $stream = ($this->tunnelOpener)($this->resource, $host, $port);
+        if ($stream === false || $stream === null) {
+            throw new ConnectionException(
+                \sprintf('Unable to open tunnel to %s:%d.', $host, $port),
+            );
+        }
+
+        $this->updateActivity();
+        return new Tunnel($stream);
+    }
+
+    public function proxyTo(string $targetHost, string $targetUser, int $targetPort = 22): self
+    {
+        if (!$this->isConnected()) {
+            throw new ConnectionException('SSH connection is not established.');
+        }
+
+        $proxy = new self(
+            $this->auth,
+            $targetUser,
+            maxOutputSize: $this->maxOutputSize,
+            commandTimeout: $this->commandTimeout,
+        );
+
+        $proxy->bastionConnection = $this;
+        $proxy->bastionTargetHost = $targetHost;
+        $proxy->bastionTargetPort = $targetPort;
+
+        return $proxy;
+    }
+
     public function pipeline(callable $configure, bool $haltOnFailure = true): PipelineResult
     {
         $pipeline = new CommandPipeline();
@@ -300,6 +374,15 @@ class SSHConnection
         }
 
         return \ssh2_shell($resource, $termType);
+    }
+
+    private function nativeTunnelOpener(mixed $resource, string $host, int $port): mixed
+    {
+        if (!\is_resource($resource)) {
+            throw new ConnectionException('SSH connection resource is invalid.');
+        }
+
+        return \ssh2_tunnel($resource, $host, $port);
     }
 
     private function nativeKeepaliveSender(mixed $resource): bool

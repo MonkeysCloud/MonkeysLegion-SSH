@@ -22,6 +22,8 @@
 - **🖥️ Interactive PTY shell** — `ssh2_shell` with read/write/resize for interactive sessions
 - **🔀 Channel multiplexing** — multiple concurrent exec channels on a single connection
 - **⏱️ Per-channel command timeouts** — override timeout per `execute()` call
+- **🔌 TCP tunnel** — direct TCP forwarding through SSH via `ssh2_tunnel`
+- **🪜 Bastion proxy** — jump host support via `proxyTo()` for multi-hop connections
 - **🪞 Fake/mock mode** — socket-free testing without real SSH servers
 - **🔍 Host key verification** — SHA1 fingerprint matching against expected values
 - **📊 Transfer metrics** — track uploaded/downloaded bytes and operation counts
@@ -130,16 +132,20 @@ $scp->receive('/remote/source.dat', '/local/source.dat');
                     │           SSHConnection                     │
                     │  connect / execute / channel / shell        │
                     │  pipeline / sftp / scp                      │
-                    └────┬─────┬──────┬──────┬────────┬──────────┘
-                         │     │      │      │        │
-                    ┌────▼──┐ │ ┌────▼──┐ ┌─▼──────┐ │
-                    │ SFTP  │ │ │  SCP  │ │Command │ │
-                    │Client │ │ │Client │ │Channel │ │
-                    └───────┘ │ └───────┘ └───┬────┘ │
-                         ┌────▼──────┐   ┌────▼───┐  │
-                         │  Shell    │   │Command │  │
-                         │ Session   │   │Pipeline│  │
-                         └───────────┘   └────────┘  │
+                    └────┬─────┬──────┬──────┬──────┬──────────┘
+                         │     │      │      │      │
+                    ┌────▼──┐ │ ┌────▼──┐ ┌─▼───┐  │
+                    │ SFTP  │ │ │  SCP  │ │Tunnel│  │
+                    │Client │ │ │Client │ │      │  │
+                    └───────┘ │ └───────┘ └─────┘  │
+                         ┌────▼──────┐   ┌────▼───┐ │
+                         │  Shell    │   │Command │ │
+                         │ Session   │   │Channel │ │
+                         └───────────┘   └───┬────┘ │
+                                         ┌───▼──┐   │
+                                         │Command│   │
+                                         │Pipeline│  │
+                                         └───────┘   │
                                                  ┌────▼───────┐
                                                  │StreamHandler│
                                                  └────────────┘
@@ -159,6 +165,7 @@ $scp->receive('/remote/source.dat', '/local/source.dat');
 | `CommandResult` | Value object with output, error, and exit code |
 | `CommandChannel` | Multiplexed exec channel with read/readError/getExitStatus |
 | `ShellSession` | Interactive PTY shell with bidirectional read/write/resize |
+| `Tunnel` | Direct TCP tunnel stream through SSH with read/write/close |
 | `StreamHandler` | Low-level SSH stream read/write abstraction with timeout support |
 | `SSHFakeRegistry` | Command stub registry for deterministic testing |
 
@@ -234,6 +241,34 @@ $shell = $connection->shell('xterm-256color', 120, 40);
 $shell->write("cd /var/www && ls -la\n");
 $output = $shell->readAll();
 $shell->close();
+```
+
+#### `tunnel(string $host, int $port) → Tunnel`
+
+Opens a direct TCP tunnel through the SSH connection to a remote host:port. Returns a `Tunnel` stream for bidirectional data transfer.
+
+```php
+$tunnel = $connection->tunnel('internal-db.local', 3306);
+$tunnel->write("SELECT 1\n");
+$response = $tunnel->read(4096);
+$tunnel->close();
+```
+
+#### `proxyTo(string $host, string $user, int $port = 22) → SSHConnection`
+
+Returns a proxied `SSHConnection` that routes all commands through the current connection as a bastion/jump host. The returned connection reuses the bastion's session and executes commands via `ssh <user>@<host> '<command>'`.
+
+```php
+$bastion = SSH::runtime()
+    ->to('bastion.example.com')
+    ->as('jump-user')
+    ->withPassword('secret')
+    ->connect();
+
+$target = $bastion->proxyTo('internal-host.local', 'deploy', 2222);
+$result = $target->execute('whoami'); // runs via bastion
+$target->disconnect();                // does NOT close the bastion
+$bastion->disconnect();
 ```
 
 #### `pipeline(callable $configure, bool $haltOnFailure = true) → PipelineResult`
@@ -479,7 +514,7 @@ composer install
 composer check
 
 # Or individual checks
-composer test               # PHPUnit (270+ tests)
+composer test               # PHPUnit (292+ tests)
 composer phpstan            # PHPStan Level 9
 composer cs-check           # PSR-12 code style
 composer infection          # Mutation testing (Infection, 79% MSI threshold)
