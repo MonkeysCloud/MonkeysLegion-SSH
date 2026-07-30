@@ -14,7 +14,7 @@ class PipelineResult
         public readonly array $results,
         public readonly bool $halted,
         public readonly ?int $failedStep,
-        public readonly array $state
+        public readonly array $state,
     ) {
     }
 

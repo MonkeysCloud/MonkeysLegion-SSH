@@ -15,7 +15,7 @@ class PublicKeyAuthentication implements AuthenticationDriver
         private string $privateKeyPath,
         private ?string $passphrase = null,
         private ?string $publicKeyPath = null,
-        ?callable $authenticator = null
+        ?callable $authenticator = null,
     ) {
         $this->authenticator = $authenticator !== null
             ? $authenticator(...)
@@ -49,7 +49,7 @@ class PublicKeyAuthentication implements AuthenticationDriver
         string $username,
         string $publicKeyPath,
         string $privateKeyPath,
-        string $passphrase
+        string $passphrase,
     ): bool {
         if (!\is_resource($resource)) {
             throw new \InvalidArgumentException('SSH resource must be a valid resource.');

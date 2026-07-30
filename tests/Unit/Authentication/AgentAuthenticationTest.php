@@ -21,7 +21,7 @@ class AgentAuthenticationTest extends TestCase
             static function (mixed $resource, string $username) use (&$calls): bool {
                 $calls[] = [$resource, $username];
                 return true;
-            }
+            },
         );
 
         $resource = \fopen('php://temp', 'rb+');
@@ -34,7 +34,7 @@ class AgentAuthenticationTest extends TestCase
     public function test_authenticate_throws_when_authentication_fails(): void
     {
         $auth = new AgentAuthentication(
-            static fn (): bool => false
+            static fn (): bool => false,
         );
 
         $resource = \fopen('php://temp', 'rb+');
@@ -47,7 +47,7 @@ class AgentAuthenticationTest extends TestCase
     public function test_authenticate_exception_contains_username(): void
     {
         $auth = new AgentAuthentication(
-            static fn (): bool => false
+            static fn (): bool => false,
         );
 
         $resource = \fopen('php://temp', 'rb+');

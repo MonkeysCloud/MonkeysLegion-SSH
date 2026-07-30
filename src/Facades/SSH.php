@@ -2,9 +2,9 @@
 
 namespace MonkeysLegion\SSH\Facades;
 
-use MonkeysLegion\SSH\Core\SSHManager;
 use MonkeysLegion\SSH\Core\ConnectionBuilder;
 use MonkeysLegion\SSH\Core\SSHConnection;
+use MonkeysLegion\SSH\Core\SSHManager;
 use MonkeysLegion\SSH\SFTP\SFTPClient;
 use MonkeysLegion\SSH\Stream\CommandResult;
 use MonkeysLegion\SSH\Testing\FakeSSHConnection;
@@ -82,7 +82,6 @@ class SSH
             throw new \BadMethodCallException(\sprintf('Method [%s] does not exist on SSH connection.', $method));
         }
 
-        /** @var mixed $result */
         $result = $connection->{$method}(...$arguments);
         return $result;
     }
@@ -110,7 +109,7 @@ class SSH
                     ],
                 ],
             ],
-            static fn (): SSHConnection => new FakeSSHConnection($registry)
+            static fn (): SSHConnection => new FakeSSHConnection($registry),
         );
 
         return $registry;

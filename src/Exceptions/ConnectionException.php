@@ -2,4 +2,6 @@
 
 namespace MonkeysLegion\SSH\Exceptions;
 
-class ConnectionException extends SSHException {}
+class ConnectionException extends SSHException
+{
+}

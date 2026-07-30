@@ -14,7 +14,7 @@ class AuthenticationFailedException extends AuthenticationException
         return new self(\sprintf(
             'Public key authentication failed for user [%s] using key [%s].',
             $username,
-            $privateKeyPath
+            $privateKeyPath,
         ));
     }
 

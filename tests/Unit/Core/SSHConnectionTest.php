@@ -28,7 +28,7 @@ class SSHConnectionTest extends TestCase
             $auth,
             'remote-user',
             new StreamHandler(),
-            static fn (): bool => false
+            static fn (): bool => false,
         );
 
         $this->expectException(ConnectionRefusedException::class);
@@ -54,7 +54,7 @@ class SSHConnectionTest extends TestCase
             $streamHandler,
             static fn () => $resource,
             static fn () => $channel,
-            static fn (): bool => true
+            static fn (): bool => true,
         );
         $connection->connect('localhost');
 
@@ -99,7 +99,7 @@ class SSHConnectionTest extends TestCase
             static function (mixed $channel) use (&$channels): bool {
                 $channels[] = $channel;
                 return true;
-            }
+            },
         );
         $connection->connect('localhost');
 
@@ -140,7 +140,7 @@ class SSHConnectionTest extends TestCase
                 $sessionClosed = true;
                 return true;
             },
-            static fn (): bool => false // fingerprint mismatch
+            static fn (): bool => false, // fingerprint mismatch
         );
 
         $this->expectException(HostKeyMismatchException::class);
@@ -164,7 +164,7 @@ class SSHConnectionTest extends TestCase
             null,
             null,
             null,
-            static fn (): bool => true // fingerprint matches
+            static fn (): bool => true, // fingerprint matches
         );
 
         $connection->connect('10.0.0.1', 22, 1, 'expected:fingerprint');

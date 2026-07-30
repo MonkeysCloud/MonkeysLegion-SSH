@@ -28,7 +28,7 @@ class StreamHandlerTest extends TestCase
         $handler = new StreamHandler(
             null,
             null,
-            static fn (): mixed => $stderr
+            static fn (): mixed => $stderr,
         );
 
         $channel = \fopen('php://temp', 'rb+');
@@ -51,7 +51,7 @@ class StreamHandlerTest extends TestCase
             null,
             null,
             null,
-            static fn (): int => 42
+            static fn (): int => 42,
         );
 
         $channel = \fopen('php://temp', 'rb+');

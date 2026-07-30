@@ -10,7 +10,7 @@ class CommandPipelineTest extends TestCase
 {
     public function test_pipeline_halts_on_failure_when_enabled(): void
     {
-        $pipeline = (new CommandPipeline())
+        $pipeline = new CommandPipeline()
             ->add('echo one')
             ->add('false')
             ->add('echo three');
@@ -19,7 +19,7 @@ class CommandPipelineTest extends TestCase
             static fn (string $command): CommandResult => $command === 'false'
                 ? new CommandResult('', 'failed', 1)
                 : new CommandResult('ok', '', 0),
-            true
+            true,
         );
 
         $this->assertTrue($result->halted);
@@ -29,7 +29,7 @@ class CommandPipelineTest extends TestCase
 
     public function test_pipeline_closure_step_receives_previous_result_and_state(): void
     {
-        $pipeline = (new CommandPipeline())
+        $pipeline = new CommandPipeline()
             ->withState('target', 'world')
             ->add('echo hello')
             ->add(static function (?CommandResult $previous, array $state): string {

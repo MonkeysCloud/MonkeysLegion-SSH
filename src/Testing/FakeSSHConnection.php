@@ -62,7 +62,7 @@ class FakeSSHConnection extends SSHConnection
         }
 
         throw new \RuntimeException(
-            'SFTP is not available in fake mode. Call setFakeSftp() with a mock SFTPClient instance to enable SFTP faking.'
+            'SFTP is not available in fake mode. Call setFakeSftp() with a mock SFTPClient instance to enable SFTP faking.',
         );
     }
 

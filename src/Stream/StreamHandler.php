@@ -4,22 +4,16 @@ namespace MonkeysLegion\SSH\Stream;
 
 class StreamHandler
 {
-    /** @var \Closure */
     private \Closure $setBlocking;
 
-    /** @var \Closure */
     private \Closure $readBlock;
 
-    /** @var \Closure */
     private \Closure $fetchStream;
 
-    /** @var \Closure */
     private \Closure $getExitStatusFn;
 
-    /** @var \Closure */
     private \Closure $writeBlock;
 
-    /** @var \Closure */
     private \Closure $flush;
 
     private int $maxOutputSize;
@@ -146,7 +140,7 @@ class StreamHandler
 
             if (\strlen($buffer) > $limit) {
                 throw new \RuntimeException(
-                    \sprintf('SSH stream output exceeded maximum size of %d bytes.', $limit)
+                    \sprintf('SSH stream output exceeded maximum size of %d bytes.', $limit),
                 );
             }
         }

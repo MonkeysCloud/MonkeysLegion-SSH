@@ -9,7 +9,7 @@ class HostKeyMismatchException extends ConnectionException
         return new self(\sprintf(
             'Host key fingerprint mismatch for host [%s]. Expected fingerprint: %s',
             $host,
-            $expectedFingerprint
+            $expectedFingerprint,
         ));
     }
 }

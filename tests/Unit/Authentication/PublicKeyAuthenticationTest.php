@@ -53,11 +53,11 @@ class PublicKeyAuthenticationTest extends TestCase
                 string $username,
                 string $publicKey,
                 string $privateKey,
-                string $passphrase
+                string $passphrase,
             ) use (&$calls): bool {
                 $calls[] = [$resource, $username, $publicKey, $privateKey, $passphrase];
                 return true;
-            }
+            },
         );
 
         $resource = \fopen('php://temp', 'rb+');

@@ -2,8 +2,8 @@
 
 namespace Tests\Unit\Authentication;
 
-use MonkeysLegion\SSH\Exceptions\AuthenticationFailedException;
 use MonkeysLegion\SSH\Authentication\PasswordAuthentication;
+use MonkeysLegion\SSH\Exceptions\AuthenticationFailedException;
 use PHPUnit\Framework\TestCase;
 
 class PasswordAuthenticationTest extends TestCase
@@ -22,7 +22,7 @@ class PasswordAuthenticationTest extends TestCase
             static function (mixed $resource, string $username, string $password) use (&$calls): bool {
                 $calls[] = [$resource, $username, $password];
                 return true;
-            }
+            },
         );
 
         $resource = \fopen('php://temp', 'rb+');
@@ -36,7 +36,7 @@ class PasswordAuthenticationTest extends TestCase
     {
         $auth = new PasswordAuthentication(
             'test-password',
-            static fn (): bool => false
+            static fn (): bool => false,
         );
 
         $resource = \fopen('php://temp', 'rb+');

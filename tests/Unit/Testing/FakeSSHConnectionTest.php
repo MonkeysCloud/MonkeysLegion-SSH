@@ -199,7 +199,7 @@ class FakeSSHConnectionTest extends TestCase
             static function ($pipeline): void {
                 $pipeline->add('echo one')->add('false')->add('echo three');
             },
-            false
+            false,
         );
 
         $this->assertFalse($result->halted);

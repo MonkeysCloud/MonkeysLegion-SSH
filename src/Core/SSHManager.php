@@ -53,7 +53,7 @@ class SSHManager
 
     public function connection(?string $name = null): SSHConnection
     {
-        $name = $name ?? $this->defaultConnection;
+        $name ??= $this->defaultConnection;
 
         // Return cached connection if available
         if (isset($this->connections[$name])) {
@@ -146,7 +146,6 @@ class SSHManager
     /**
      * Validate that a profile has the required fields for connection resolution.
      *
-     * @param string $name
      * @param array<string, mixed> $profile
      */
     private function validateProfile(string $name, array $profile): void
@@ -165,7 +164,7 @@ class SSHManager
         if (!\is_string($auth) || !\in_array($auth, ['password', 'key', 'agent'], true)) {
             throw new \InvalidArgumentException(\sprintf(
                 'Connection profile [%s] auth must be one of: password, key, agent.',
-                $name
+                $name,
             ));
         }
     }

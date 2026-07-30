@@ -87,7 +87,7 @@ class PipelineResultTest extends TestCase
             [new CommandResult('', 'error', 1)],
             true,
             0,
-            []
+            [],
         );
 
         $this->assertSame(0, $result->failedStep);
@@ -99,7 +99,7 @@ class PipelineResultTest extends TestCase
             [new CommandResult('ok', '', 0)],
             false,
             null,
-            []
+            [],
         );
 
         $this->assertNull($result->failedStep);

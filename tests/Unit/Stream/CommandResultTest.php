@@ -2,8 +2,8 @@
 
 namespace Tests\Unit\Stream;
 
-use PHPUnit\Framework\TestCase;
 use MonkeysLegion\SSH\Stream\CommandResult;
+use PHPUnit\Framework\TestCase;
 
 class CommandResultTest extends TestCase
 {

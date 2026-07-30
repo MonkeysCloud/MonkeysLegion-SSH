@@ -2,9 +2,6 @@
 
 namespace Tests\Unit\Core;
 
-use MonkeysLegion\SSH\Authentication\AgentAuthentication;
-use MonkeysLegion\SSH\Authentication\PasswordAuthentication;
-use MonkeysLegion\SSH\Authentication\PublicKeyAuthentication;
 use MonkeysLegion\SSH\Core\ConnectionBuilder;
 use PHPUnit\Framework\TestCase;
 
@@ -83,14 +80,14 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Port must be between 1 and 65535.');
 
-        (new ConnectionBuilder())->port(0);
+        new ConnectionBuilder()->port(0);
     }
 
     public function test_port_rejects_negative(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        (new ConnectionBuilder())->port(-1);
+        new ConnectionBuilder()->port(-1);
     }
 
     public function test_port_rejects_above_65535(): void
@@ -98,7 +95,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Port must be between 1 and 65535.');
 
-        (new ConnectionBuilder())->port(65536);
+        new ConnectionBuilder()->port(65536);
     }
 
     public function test_port_accepts_boundary_values(): void
@@ -118,14 +115,14 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Timeout must be at least 1 second.');
 
-        (new ConnectionBuilder())->timeout(0);
+        new ConnectionBuilder()->timeout(0);
     }
 
     public function test_timeout_rejects_negative(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        (new ConnectionBuilder())->timeout(-5);
+        new ConnectionBuilder()->timeout(-5);
     }
 
     // ----------------------------------------------------------------
@@ -137,14 +134,14 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Max output size must be at least 1 byte.');
 
-        (new ConnectionBuilder())->maxOutputSize(0);
+        new ConnectionBuilder()->maxOutputSize(0);
     }
 
     public function test_max_output_size_rejects_negative(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        (new ConnectionBuilder())->maxOutputSize(-1);
+        new ConnectionBuilder()->maxOutputSize(-1);
     }
 
     // ----------------------------------------------------------------
@@ -156,7 +153,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Authentication method must be specified');
 
-        (new ConnectionBuilder())->to('localhost')->connect();
+        new ConnectionBuilder()->to('localhost')->connect();
     }
 
     public function test_builder_requires_host(): void
@@ -164,7 +161,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Host must be specified');
 
-        (new ConnectionBuilder())->as('user')->withPassword('password')->connect();
+        new ConnectionBuilder()->as('user')->withPassword('password')->connect();
     }
 
     public function test_builder_requires_username(): void
@@ -172,7 +169,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Username must be specified');
 
-        (new ConnectionBuilder())
+        new ConnectionBuilder()
             ->to('localhost')
             ->withPassword('password')
             ->connect();
@@ -187,7 +184,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile requires a valid host.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'username' => 'user',
             'auth' => 'password',
             'password' => 'password',
@@ -199,7 +196,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile requires a valid host.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => '',
             'username' => 'user',
             'auth' => 'password',
@@ -212,7 +209,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile requires a valid username.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'auth' => 'password',
             'password' => 'password',
@@ -224,7 +221,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile requires a valid username.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => '',
             'auth' => 'password',
@@ -241,7 +238,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile contains an invalid auth type.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 123,
@@ -266,7 +263,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile contains an invalid password value.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -279,7 +276,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile requires a valid private_key for key auth.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'key',
@@ -291,7 +288,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile requires a valid private_key for key auth.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'key',
@@ -304,7 +301,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile requires a valid private_key for key auth.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'key',
@@ -317,7 +314,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile contains an invalid passphrase value.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'key',
@@ -388,7 +385,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile contains an invalid fingerprint.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -402,7 +399,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile contains an invalid fingerprint.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -444,7 +441,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile field [command_timeout] must be a positive integer.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -458,7 +455,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile field [command_timeout] must be at least 1.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -500,7 +497,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile field [max_output_size] must be a positive integer.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -532,7 +529,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile field [port] must be a positive integer.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -546,7 +543,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile field [port] must be at least 1.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -574,7 +571,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile field [timeout] must be a positive integer.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',
@@ -588,7 +585,7 @@ class ConnectionBuilderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Connection profile field [timeout] must be at least 1.');
 
-        (new ConnectionBuilder())->fromProfile([
+        new ConnectionBuilder()->fromProfile([
             'host' => 'localhost',
             'username' => 'user',
             'auth' => 'password',

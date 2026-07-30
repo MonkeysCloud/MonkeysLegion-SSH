@@ -65,7 +65,7 @@ class SFTPClient
         return $bytes;
     }
 
-    public function mkdir(string $remotePath, int $mode = 0775, bool $recursive = false): void
+    public function mkdir(string $remotePath, int $mode = 0o775, bool $recursive = false): void
     {
         $success = @\mkdir($this->streamPath($remotePath), $mode, $recursive);
         if (!$success && !\is_dir($this->streamPath($remotePath))) {

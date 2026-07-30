@@ -29,8 +29,8 @@
         "test-coverage": "phpunit --coverage-html coverage",
         "phpstan": "phpstan analyse src tests",
         "psalm": "psalm",
-        "cs-fix": "php-cs-fixer fix src tests",
-        "cs-check": "php-cs-fixer check src tests"
+        "cs-fix": "php-cs-fixer fix",
+        "cs-check": "php-cs-fixer check"
     },
     "minimum-stability": "dev",
     "prefer-stable": true

@@ -3,8 +3,8 @@
 namespace Tests\Unit\Core;
 
 use MonkeysLegion\SSH\Core\ConnectionBuilder;
-use MonkeysLegion\SSH\Core\SSHManager;
 use MonkeysLegion\SSH\Core\SSHConnection;
+use MonkeysLegion\SSH\Core\SSHManager;
 use PHPUnit\Framework\TestCase;
 
 class SSHManagerTest extends TestCase
@@ -17,7 +17,7 @@ class SSHManagerTest extends TestCase
         return static function () use (&$count): SSHConnection {
             $count++;
             /** @var SSHConnection $connection */
-            $connection = (new \ReflectionClass(SSHConnection::class))->newInstanceWithoutConstructor();
+            $connection = new \ReflectionClass(SSHConnection::class)->newInstanceWithoutConstructor();
             return $connection;
         };
     }
@@ -104,7 +104,7 @@ class SSHManagerTest extends TestCase
                     ],
                 ],
             ],
-            $this->stubResolver($resolved)
+            $this->stubResolver($resolved),
         );
 
         $first = $manager->connection();
@@ -135,7 +135,7 @@ class SSHManagerTest extends TestCase
                     ],
                 ],
             ],
-            $this->stubResolver($resolved)
+            $this->stubResolver($resolved),
         );
 
         $first = $manager->connection('main');
@@ -283,7 +283,7 @@ class SSHManagerTest extends TestCase
                     ],
                 ],
             ],
-            $this->stubResolver($resolved)
+            $this->stubResolver($resolved),
         );
 
         // Resolve and cache
@@ -365,7 +365,7 @@ class SSHManagerTest extends TestCase
                     'alt' => ['host' => '127.0.0.2', 'username' => 'test2', 'auth' => 'password', 'password' => 'secret2'],
                 ],
             ],
-            $this->stubResolver($resolved)
+            $this->stubResolver($resolved),
         );
 
         $manager->setDefaultConnection('alt');
@@ -405,7 +405,7 @@ class SSHManagerTest extends TestCase
                     'main' => ['host' => '127.0.0.1', 'username' => 'test', 'auth' => 'password', 'password' => 'secret'],
                 ],
             ],
-            $this->stubResolver($resolved)
+            $this->stubResolver($resolved),
         );
 
         // Resolve and cache
@@ -432,7 +432,7 @@ class SSHManagerTest extends TestCase
                     'alt' => ['host' => '127.0.0.2', 'username' => 'test2', 'auth' => 'password', 'password' => 'secret2'],
                 ],
             ],
-            $this->stubResolver($resolved)
+            $this->stubResolver($resolved),
         );
 
         // Resolve both

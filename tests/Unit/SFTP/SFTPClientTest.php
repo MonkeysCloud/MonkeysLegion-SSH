@@ -90,7 +90,7 @@ class FakeSftpStreamWrapper
         $size = \strlen(self::$storage[$this->path] ?? '');
         return [
             'size' => $size,
-            'mode' => 0100644,
+            'mode' => 0o100644,
         ];
     }
 
@@ -105,7 +105,7 @@ class FakeSftpStreamWrapper
         }
         return [
             'size' => \strlen(self::$storage[$remotePath]),
-            'mode' => 0100644,
+            'mode' => 0o100644,
         ];
     }
 }
@@ -268,7 +268,7 @@ class SFTPClientTest extends TestCase
             static function () use ($handle, &$initCalls): mixed {
                 $initCalls++;
                 return $handle;
-            }
+            },
         );
 
         $localFile = $this->createTempFile('content-one');

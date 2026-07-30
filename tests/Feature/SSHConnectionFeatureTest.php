@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use MonkeysLegion\SSH\Core\CommandPipeline;
 use MonkeysLegion\SSH\Core\SSHManager;
-use PHPUnit\Framework\TestCase;
 use MonkeysLegion\SSH\Facades\SSH;
 use MonkeysLegion\SSH\Stream\CommandResult;
+use PHPUnit\Framework\TestCase;
 
 class SSHConnectionFeatureTest extends TestCase
 {
@@ -76,10 +76,10 @@ class SSHConnectionFeatureTest extends TestCase
         \file_put_contents($uploadPath, $content);
 
         $sftp = $connection->sftp();
-        $sftp->mkdir($remoteBaseDir . '/nested', 0775, true);
+        $sftp->mkdir($remoteBaseDir . '/nested', 0o775, true);
 
         $uploaded = $sftp->upload($uploadPath, $remoteFile);
-        $sftp->chmod($remoteFile, 0644);
+        $sftp->chmod($remoteFile, 0o644);
         $downloaded = $sftp->download($remoteFile, $downloadPath);
 
         $this->assertSame(\strlen($content), $uploaded);

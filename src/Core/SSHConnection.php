@@ -118,7 +118,7 @@ class SSHConnection
             throw new AuthenticationFailedException(
                 'SSH authentication failed.',
                 (int) $exception->getCode(),
-                $exception
+                $exception,
             );
         }
 
@@ -136,7 +136,7 @@ class SSHConnection
         $exitMarker = '__MLSSH_EXIT_' . \bin2hex(\random_bytes(8)) . '__';
         $wrappedCommand = \sprintf(
             'sh -lc %s',
-            \escapeshellarg($command . '; printf "\n' . $exitMarker . '%s" "$?"')
+            \escapeshellarg($command . '; printf "\n' . $exitMarker . '%s" "$?"'),
         );
 
         $channel = ($this->executor)($this->resource, $wrappedCommand);
