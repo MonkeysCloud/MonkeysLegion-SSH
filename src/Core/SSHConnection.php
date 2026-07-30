@@ -7,6 +7,7 @@ use MonkeysLegion\SSH\Exceptions\AuthenticationFailedException;
 use MonkeysLegion\SSH\Exceptions\ConnectionException;
 use MonkeysLegion\SSH\Exceptions\ConnectionRefusedException;
 use MonkeysLegion\SSH\Exceptions\HostKeyMismatchException;
+use MonkeysLegion\SSH\SFTP\ScpClient;
 use MonkeysLegion\SSH\SFTP\SFTPClient;
 use MonkeysLegion\SSH\Stream\CommandResult;
 use MonkeysLegion\SSH\Stream\StreamHandler;
@@ -16,6 +17,7 @@ class SSHConnection
     private mixed $resource = null;
     private StreamHandler $streamHandler;
     private ?SFTPClient $sftpClient = null;
+    private ?ScpClient $scpClient = null;
 
     /**
      * @var \Closure(string, int, array<string, string>): mixed
@@ -166,6 +168,7 @@ class SSHConnection
             ($this->sessionCloser)($this->resource);
             $this->resource = null;
             $this->sftpClient = null;
+            $this->scpClient = null;
         }
     }
 
@@ -186,6 +189,20 @@ class SSHConnection
 
         $this->sftpClient = new SFTPClient($this->resource);
         return $this->sftpClient;
+    }
+
+    public function scp(): ScpClient
+    {
+        if (!$this->isConnected()) {
+            throw new ConnectionException('SSH connection is not established.');
+        }
+
+        if ($this->scpClient !== null) {
+            return $this->scpClient;
+        }
+
+        $this->scpClient = new ScpClient($this->resource);
+        return $this->scpClient;
     }
 
     public function pipeline(callable $configure, bool $haltOnFailure = true): PipelineResult

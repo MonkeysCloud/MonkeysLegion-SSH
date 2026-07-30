@@ -93,3 +93,55 @@ function ssh2_sftp(mixed $session): mixed
 function ssh2_sftp_chmod(mixed $sftp, string $filename, int $mode): bool
 {
 }
+
+/**
+ * @param resource|object $sftp
+ * @return array<string, int>|false
+ */
+function ssh2_sftp_stat(mixed $sftp, string $path): array|false
+{
+}
+
+/**
+ * @param resource|object $sftp
+ * @return array<string, int>|false
+ */
+function ssh2_sftp_lstat(mixed $sftp, string $path): array|false
+{
+}
+
+/**
+ * @param resource|object $sftp
+ */
+function ssh2_sftp_rename(mixed $sftp, string $from, string $to): bool
+{
+}
+
+/**
+ * @param resource|object $sftp
+ */
+function ssh2_sftp_symlink(mixed $sftp, string $target, string $link): bool
+{
+}
+
+/**
+ * @param resource|object $sftp
+ * @return string|false
+ */
+function ssh2_sftp_readlink(mixed $sftp, string $link): string|false
+{
+}
+
+/**
+ * @param resource|object $session
+ */
+function ssh2_scp_send(mixed $session, string $local_file, string $remote_file, int $create_mode = 0o644): bool
+{
+}
+
+/**
+ * @param resource|object $session
+ */
+function ssh2_scp_recv(mixed $session, string $remote_file, string $local_file): bool
+{
+}

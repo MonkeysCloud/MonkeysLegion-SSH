@@ -12,16 +12,66 @@ class SFTPClient
      */
     private \Closure $initializer;
 
+    /**
+     * @var \Closure(mixed, string): (array<int|string, int>|false)
+     */
+    private \Closure $statCallback;
+
+    /**
+     * @var \Closure(mixed, string, string): bool
+     */
+    private \Closure $renameCallback;
+
+    /**
+     * @var \Closure(mixed, string, string): bool
+     */
+    private \Closure $symlinkCallback;
+
+    /**
+     * @var \Closure(mixed, string): (string|false)
+     */
+    private \Closure $readlinkCallback;
+
+    /**
+     * @var \Closure(mixed, string, int): bool
+     */
+    private \Closure $chmodCallback;
+
+    /**
+     * @param array{
+     *     stat?: callable,
+     *     rename?: callable,
+     *     symlink?: callable,
+     *     readlink?: callable,
+     *     chmod?: callable,
+     * } $nativeCallbacks
+     */
     public function __construct(
         private mixed $session,
         ?SFTPTransferMetrics $metrics = null,
         ?callable $initializer = null,
         private string $streamScheme = 'ssh2.sftp',
+        array $nativeCallbacks = [],
     ) {
         $this->metrics = $metrics ?? new SFTPTransferMetrics();
         $this->initializer = $initializer !== null
             ? $initializer(...)
             : $this->nativeInitializer(...);
+        $this->statCallback = isset($nativeCallbacks['stat'])
+            ? $nativeCallbacks['stat'](...)
+            : $this->nativeStat(...);
+        $this->renameCallback = isset($nativeCallbacks['rename'])
+            ? $nativeCallbacks['rename'](...)
+            : $this->nativeRename(...);
+        $this->symlinkCallback = isset($nativeCallbacks['symlink'])
+            ? $nativeCallbacks['symlink'](...)
+            : $this->nativeSymlink(...);
+        $this->readlinkCallback = isset($nativeCallbacks['readlink'])
+            ? $nativeCallbacks['readlink'](...)
+            : $this->nativeReadlink(...);
+        $this->chmodCallback = isset($nativeCallbacks['chmod'])
+            ? $nativeCallbacks['chmod'](...)
+            : $this->nativeChmod(...);
     }
 
     public function upload(string $localPath, string $remotePath): int
@@ -75,13 +125,9 @@ class SFTPClient
 
     public function chmod(string $remotePath, int $mode): void
     {
-        $normalized = \str_starts_with($remotePath, '/') ? $remotePath : '/' . $remotePath;
+        $normalized = $this->normalizePath($remotePath);
 
-        if (\function_exists('ssh2_sftp_chmod')) {
-            $success = \ssh2_sftp_chmod($this->handle(), $normalized, $mode);
-        } else {
-            $success = \chmod($this->streamPath($normalized), $mode);
-        }
+        $success = ($this->chmodCallback)($this->handle(), $normalized, $mode);
 
         if (!$success) {
             throw new \RuntimeException(\sprintf('Unable to chmod remote path: %s', $remotePath));
@@ -96,16 +142,132 @@ class SFTPClient
         }
     }
 
+    /**
+     * @return list<string>
+     */
+    public function ls(string $remotePath): array
+    {
+        $entries = [];
+        $path = $this->streamPath($remotePath);
+        $handle = @\opendir($path);
+        if ($handle === false) {
+            throw new \RuntimeException(\sprintf('Unable to list remote directory: %s', $remotePath));
+        }
+        while (($entry = \readdir($handle)) !== false) {
+            if ($entry !== '.' && $entry !== '..') {
+                $entries[] = $entry;
+            }
+        }
+        \closedir($handle);
+        \sort($entries);
+        return $entries;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function nlist(string $remotePath): array
+    {
+        return $this->ls($remotePath);
+    }
+
+    /**
+     * @return array<string, array<int|string, int>>
+     */
+    public function rawlist(string $remotePath): array
+    {
+        $files = $this->ls($remotePath);
+        $handle = $this->handle();
+        $normalized = $this->normalizePath($remotePath);
+
+        $result = [];
+        foreach ($files as $file) {
+            $fullPath = $normalized . '/' . $file;
+            $stats = ($this->statCallback)($handle, $fullPath);
+            if ($stats !== false) {
+                $result[$file] = $stats;
+            }
+        }
+        return $result;
+    }
+
+    public function rename(string $from, string $to): void
+    {
+        $handle = $this->handle();
+        $normalizedFrom = $this->normalizePath($from);
+        $normalizedTo = $this->normalizePath($to);
+
+        $success = ($this->renameCallback)($handle, $normalizedFrom, $normalizedTo);
+        if (!$success) {
+            throw new \RuntimeException(\sprintf('Unable to rename remote path from %s to %s', $from, $to));
+        }
+    }
+
+    /**
+     * @return array<int|string, int>
+     */
+    public function stat(string $remotePath): array
+    {
+        $handle = $this->handle();
+        $normalized = $this->normalizePath($remotePath);
+
+        $stats = ($this->statCallback)($handle, $normalized);
+        if ($stats === false) {
+            throw new \RuntimeException(\sprintf('Unable to stat remote path: %s', $remotePath));
+        }
+        return $stats;
+    }
+
+    public function fileExists(string $remotePath): bool
+    {
+        try {
+            $this->stat($remotePath);
+            return true;
+        } catch (\RuntimeException) {
+            return false;
+        }
+    }
+
+    public function symlink(string $target, string $link): void
+    {
+        $handle = $this->handle();
+        $normalizedTarget = $this->normalizePath($target);
+        $normalizedLink = $this->normalizePath($link);
+
+        $success = ($this->symlinkCallback)($handle, $normalizedTarget, $normalizedLink);
+        if (!$success) {
+            throw new \RuntimeException(\sprintf('Unable to create symlink from %s to %s', $link, $target));
+        }
+    }
+
+    public function readlink(string $link): string
+    {
+        $handle = $this->handle();
+        $normalized = $this->normalizePath($link);
+
+        $target = ($this->readlinkCallback)($handle, $normalized);
+
+        /** @var string|false $target */
+        if ($target === false) {
+            throw new \RuntimeException(\sprintf('Unable to read symlink: %s', $link));
+        }
+        return $target;
+    }
+
     public function metrics(): SFTPTransferMetrics
     {
         return $this->metrics;
     }
 
+    private function normalizePath(string $remotePath): string
+    {
+        return \str_starts_with($remotePath, '/') ? $remotePath : '/' . $remotePath;
+    }
+
     private function streamPath(string $remotePath): string
     {
-        $normalized = \str_starts_with($remotePath, '/') ? $remotePath : '/' . $remotePath;
         $handle = $this->handle();
-        return \sprintf('%s://%d%s', $this->streamScheme, (int) $handle, $normalized);
+        return \sprintf('%s://%d%s', $this->streamScheme, (int) $handle, $this->normalizePath($remotePath));
     }
 
     /**
@@ -145,5 +307,53 @@ class SFTPClient
         }
 
         return $resource;
+    }
+
+    /**
+     * @return array<int|string, int>|false
+     */
+    private function nativeStat(mixed $handle, string $path): array|false
+    {
+        if (!\is_resource($handle)) {
+            throw new \RuntimeException('SFTP resource is invalid.');
+        }
+
+        return \ssh2_sftp_stat($handle, $path);
+    }
+
+    private function nativeRename(mixed $handle, string $from, string $to): bool
+    {
+        if (!\is_resource($handle)) {
+            throw new \RuntimeException('SFTP resource is invalid.');
+        }
+
+        return \ssh2_sftp_rename($handle, $from, $to);
+    }
+
+    private function nativeSymlink(mixed $handle, string $target, string $link): bool
+    {
+        if (!\is_resource($handle)) {
+            throw new \RuntimeException('SFTP resource is invalid.');
+        }
+
+        return \ssh2_sftp_symlink($handle, $target, $link);
+    }
+
+    private function nativeReadlink(mixed $handle, string $link): string|false
+    {
+        if (!\is_resource($handle)) {
+            throw new \RuntimeException('SFTP resource is invalid.');
+        }
+
+        return \ssh2_sftp_readlink($handle, $link);
+    }
+
+    private function nativeChmod(mixed $handle, string $path, int $mode): bool
+    {
+        if (!\is_resource($handle)) {
+            throw new \RuntimeException('SFTP resource is invalid.');
+        }
+
+        return \ssh2_sftp_chmod($handle, $path, $mode);
     }
 }

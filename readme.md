@@ -175,34 +175,64 @@ foreach ($result->results as $cmd => $output) {
 
 #### `sftp() → SFTPClient`
 
-**Opens an SFTP channel for file operations (upload, download, mkdir, chmod, delete).** Returns an `SFTPClient` instance with transfer metrics.
+**Opens an SFTP channel for file operations.** Returns an `SFTPClient` instance with transfer metrics and directory operations.
 
 - ❌ **Establishes connection:** No — reuses the existing SSH connection
 - ❌ **Closes connection on return:** No — SFTP session stays open
-- **Returns:** `SFTPClient` with transfer and directory methods
+- **Returns:** `SFTPClient` with transfer, directory, and metadata methods
 
 ```php
 $sftp = SSH::sftp();
 
-// Upload a file
+// Upload / download
 $sftp->upload('/local/file.txt', '/remote/file.txt');
-
-// Download a file
 $sftp->download('/remote/backup.sql', '/local/backup.sql');
 
-// Create directories
-$sftp->mkdir('/var/www/uploads');
+// Directory operations
+$sftp->mkdir('/var/www/uploads', 0755, recursive: true);
+$sftp->ls('/var/www');       // list files → ['uploads', 'index.php']
+$sftp->nlist('/var/www');    // alias for ls
+$sftp->rawlist('/var/www');  // list with stat info per entry
 
-// Set permissions (octal)
-$sftp->chmod('/var/www/uploads', 0755);
+// Metadata
+$sftp->stat('/remote/file.txt');  // returns size, mode, uid, gid, atime, mtime
+$sftp->fileExists('/remote/file.txt');
+$sftp->chmod('/remote/file.txt', 0644);
 
-// Delete a file
-$sftp->delete('/var/www/temp.log');
+// Rename / delete
+$sftp->rename('/old.txt', '/new.txt');
+$sftp->delete('/remote/temp.log');
 
-// Access metrics
-echo $sftp->metrics->uploadedBytes;
-echo $sftp->metrics->downloadedBytes;
-echo $sftp->metrics->operationCount;
+// Symlinks
+$sftp->symlink('/target/path', '/link/path');
+$sftp->readlink('/link/path');  // returns '/target/path'
+
+// Transfer metrics
+echo $sftp->metrics()->uploadedBytes();
+echo $sftp->metrics()->downloadedBytes();
+echo $sftp->metrics()->uploadCount();
+echo $sftp->metrics()->downloadCount();
+```
+
+#### `scp() → ScpClient`
+
+**Opens an SCP channel for file transfers.** Uses the native `ssh2_scp_send` / `ssh2_scp_recv` functions.
+
+- ❌ **Establishes connection:** No — reuses the existing SSH connection
+- ❌ **Closes connection on return:** No — SCP session stays open
+- **Returns:** `ScpClient` with `send` and `receive` methods
+
+```php
+$scp = SSH::scp();
+
+// Send a file (default mode 0644)
+$scp->send('/local/file.txt', '/remote/file.txt');
+
+// Send with explicit permissions
+$scp->send('/local/script.sh', '/remote/script.sh', 0755);
+
+// Receive a file
+$scp->receive('/remote/source.dat', '/local/source.dat');
 ```
 
 ### Facade Methods
